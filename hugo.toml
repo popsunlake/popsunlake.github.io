@@ -1,4 +1,4 @@
-baseURL = 'http://example.org/'
+baseURL = 'https://popsunlake.github.io/'
 languageCode = 'en-us'
-title = 'My New Hugo Site'
+title = '杨旭泽个人博客'
 theme = 'ananke'

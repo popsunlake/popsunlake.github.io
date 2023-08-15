@@ -1,7 +1,40 @@
 ---
-title: "搭建个人博客站点"
-date: 2023-08-13T20:43:18+08:00
+title: "利用github pages和hugo搭建个人博客站点"
+date: 2020-09-15T11:30:03+00:00
+# date: {{ .Date }}
+# weight: 1
+# aliases: ["/first"]
+# tags: ["first"]
+author: "yangxuze"
+# author: ["Me", "You"] # multiple authors
+showToc: true
+TocOpen: true
 draft: false
+hidemeta: false
+comments: true
+# description: "Desc Text."
+canonicalURL: "https://canonical.url/to/page"
+disableHLJS: false # to disable highlightjs
+disableShare: false
+disableHLJS: false
+hideSummary: false
+searchHidden: true
+ShowReadingTime: true
+ShowBreadCrumbs: true
+ShowPostNavLinks: true
+ShowWordCount: true
+ShowRssButtonInSectionTermList: true
+UseHugoToc: true
+cover:
+    image: "<image path/url>" # image path/url
+    alt: "<alt text>" # alt text
+    caption: "<text>" # display caption under cover
+    relative: false # when using page bundles set this to true
+    hidden: true # only hide on current single page
+editPost:
+    URL: "https://github.com/popsunlake/popsunlake.github.io/tree/master/content"
+    Text: "Suggest Changes" # edit text
+    appendFilePath: true # to append file path to Edit link
 ---
 
 # 利用github pages和hugo搭建个人博客站点
@@ -16,11 +49,11 @@ draft: false
 
    下载extend版本的，解压后即可使用。
 
-   ![hugo下载安装](/img/hugo下载安装.png)
+   ![hugo下载安装](images/hugo下载安装.png)
 
    为后续执行方便，加入环境变量
 
-   ![加环境变量](/img/加环境变量.png)
+   ![加环境变量](images/加环境变量.png)
 
 2. git的下载配置不再赘述
 
@@ -51,7 +84,7 @@ draft: false
 
 接下来就是将网站代码对接github pages，有两种方法，一种是使用github默认的workflow。一种是使用自定义的workflow。
 
-#### 3.1 默认的workflow
+### 3.1 默认的workflow
 
 1. 在github仓库-settings-pages页面将分支后的文件夹修改为docs
 
@@ -68,7 +101,7 @@ draft: false
    
    ```
 
-#### 3.2 自定义的workflow
+### 3.2 自定义的workflow
 
 1. 修改hugo.toml中文件的baseURL为https://popsunlake.github.io/和title，去掉publishDir
 
@@ -181,19 +214,16 @@ draft: false
 
         - `env:`: 设置环境变量，包括 Hugo 的版本。
 
-        - ```
-          steps:
-          ```
+        - `steps:`: 定义一系列的步骤来完成任务。
 
-          : 定义一系列的步骤来完成任务。
+          * 下载并安装 Hugo CLI。
 
-          - 下载并安装 Hugo CLI。
-          - 安装 Dart Sass。
-          - 检出代码库，包括子模块。
-          - 设置 Pages。
-          - 安装 Node.js 依赖。
-          - 使用 Hugo 构建网站。
-          - 上传构建结果作为 artifact。
+          * 安装 Dart Sass。
+          * 检出代码库，包括子模块。
+          * 设置 Pages。
+          * 安装 Node.js 依赖。
+          * 使用 Hugo 构建网站。
+          * 上传构建结果作为 artifact。
 
       - `deploy:`: 这个任务用于部署网站到 GitHub Pages。
 
@@ -214,7 +244,7 @@ draft: false
 
    
 
-#### 3.3 比较
+### 3.3 比较
 
 推荐自定义的workflow方式，原因如下：
 
@@ -376,5 +406,13 @@ markup:
     # lineNos: true
     # style: monokai
 
+```
+
+在archetypes目录下新增模板文件post.md。
+
+使用该模板产生新的文件
+
+```
+hugo new --kind post posts/test-paper.md
 ```
 

@@ -1,139 +1,219 @@
-baseURL: "https://popsunlake.github.io/"
-title: yxz tech blog
-paginate: 5
-theme: PaperMod
+# https://gohugo.io/overview/configuration/
 
-enableRobotsTXT: true
-buildDrafts: false
-buildFuture: true
-buildExpired: true
+baseurl: "https://popsunlake.github.io/"
+disablePathToLower: false
+languageCode: en-us
+title: Hackerman's Hacking Tutorials
+theme: Hugo-Octopress
 
-googleAnalytics: UA-123-45
+# Number of blog posts displayed on each pagination page.
+# No need for pagination in the current setup.
+# paginate: 0
 
-minify:
-  disableXML: true
-  minifyOutput: true
+# Frontmatter will be in yaml.
+metadataformat: yaml
 
-params:
-  env: production # to enable google analytics, opengraph, twitter-cards and schema.
-  title: ExampleSite
-  description: "ExampleSite description"
-  keywords: [Blog, Portfolio, PaperMod]
-  author: Me
-  # author: ["Me", "You"] # multiple authors
-  images: ["<link or path of image for opengraph, twitter-cards>"]
-  DateFormat: "January 2, 2006"
-  defaultTheme: auto # dark, light
-  disableThemeToggle: false
+# Disqus configuration.
+disqusShortname: parsiya
 
-  ShowReadingTime: true
-  ShowShareButtons: true
-  ShowPostNavLinks: true
-  ShowBreadCrumbs: true
-  ShowCodeCopyButtons: false
-  ShowWordCount: true
-  ShowRssButtonInSectionTermList: true
-  UseHugoToc: true
-  disableSpecial1stPost: false
-  disableScrollToTop: false
-  comments: false
-  hidemeta: false
-  hideSummary: false
-  showtoc: false
-  tocopen: false
+# Only generate HTML output for these places. No need for RSS/XML/whatever.
+outputs:
+  section:
+    - HTML
+  taxonomy:
+    - HTML
+#  taxonomyTerm:
+#    - HTML
 
-  assets:
-    # disableHLJS: true # to disable highlight.js
-    # disableFingerprinting: true
-    favicon: "<link / abs url>"
-    favicon16x16: "<link / abs url>"
-    favicon32x32: "<link / abs url>"
-    apple_touch_icon: "<link / abs url>"
-    safari_pinned_tab: "<link / abs url>"
+# Permalink URL type. Don't change this because it will invalidate all old links
+# unless you like to do a ton of aliases. Add `url:` to your new posts instead.
+permalinks:
+  post: "/blog/:year-:month-:day-:title/"
 
-  label:
-    text: "Home"
-    icon: /apple-touch-icon.png
-    iconHeight: 35
-
-  # profile-mode
-  profileMode:
-    enabled: false # needs to be explicitly set
-    title: ExampleSite
-    subtitle: "This is subtitle"
-    imageUrl: "<img location>"
-    imageWidth: 120
-    imageHeight: 120
-    imageTitle: my image
-    buttons:
-      - name: Posts
-        url: posts
-      - name: Tags
-        url: tags
-
-  # home-info mode
-  homeInfoParams:
-    Title: "Hi there \U0001F44B"
-    Content: Welcome to my blog
-
-  socialIcons:
-    - name: twitter
-      url: "https://twitter.com/"
-    - name: stackoverflow
-      url: "https://stackoverflow.com"
-    - name: github
-      url: "https://github.com/"
-
-  analytics:
-    google:
-      SiteVerificationTag: "XYZabc"
-    bing:
-      SiteVerificationTag: "XYZabc"
-    yandex:
-      SiteVerificationTag: "XYZabc"
-
-  cover:
-    hidden: true # hide everywhere but not in structured data
-    hiddenInList: true # hide on list pages and home
-    hiddenInSingle: true # hide on single page
-
-  editPost:
-    URL: "https://github.com/popsunlake.github.io/content"
-    Text: "Suggest Changes" # edit text
-    appendFilePath: true # to append file path to Edit link
-
-  # for search
-  # https://fusejs.io/api/options.html
-  fuseOpts:
-    isCaseSensitive: false
-    shouldSort: true
-    location: 0
-    distance: 1000
-    threshold: 0.4
-    minMatchCharLength: 0
-    limit: 10 # refer: https://www.fusejs.io/api/methods.html#search
-    keys: ["title", "permalink", "summary", "content"]
+# Menu
 menu:
+  # Navigation menu.
+  # All links except home ("/") will open in a new window.
+  # Template: {{theme-dir}}/layouts/partials/navigation.html.
   main:
-    - identifier: categories
-      name: categories
-      url: /categories/
+    - Name: About Me!
+      URL: /about/
+      weight: 2
+    - Name: Cheat Sheet
+      URL: /cheatsheet/
+      weight: 5
+    - Name: My Clone
+      URL: "https://parsiya.io/"
       weight: 10
-    - identifier: tags
-      name: tags
-      url: /tags/
+    - Name: Source Repo
+      URL: "https://github.com/parsiya/parsiya.net"
+      weight: 15
+    - Name: Manual Work is a Bug
+      URL: https://queue.acm.org/detail.cfm?id=3197520
       weight: 20
-    - identifier: example
-      name: example.org
-      url: https://example.org
+    - Name: The Other Guy from Wham!
+      URL: "https://www.google.com/search?q=andrew+ridgeley"
+      weight: 25
+
+  # Sidebar menu items.
+  sidebar:
+    - Name: Thick Client Proxying
+      URL: /categories/category1/
+      weight: 2
+    - Name: CTFs/Writeups
+      URL: /categories/writeup/
+      weight: 4
+    - Name: Attack Surface Analysis
+      URL: /categories/attack-surface-analysis/
+      weight: 6
+    - Name: Semgrep
+      URL: /categories/semgrep/
+      weight: 8
+    - Name: Bug Bounty
+      URL: /categories/bug-bounty/
+      weight: 10
+    - Name: Blockchain (lol)
+      URL: /categories/blockchain/
+      weight: 15
+    - Name: Crypto(graphy)
+      URL: /categories/crypto/
+      weight: 20
+    - Name: Burp Extension Development
+      URL: /categories/burp-extension/
+      weight: 25
+    - Name: Automation
+      URL: /categories/automation/
       weight: 30
-# Read: https://github.com/adityatelange/hugo-PaperMod/wiki/FAQs#using-hugos-syntax-highlighter-chroma
-pygmentsUseClasses: true
+    - Name: Reverse Engineering
+      URL: /categories/reverse-engineering/
+      weight: 35
+    - Name: WinAppDbg (use Frida instead)
+      URL: /categories/winappdbg/
+      weight: 40
+    - Name: AWSome.pw - S3 bucket squatting - my very "legit" branded vulnerability
+      URL: "https://awsome.pw"
+      weight: 45
+
+# Parameters.
+params:
+
+  # Open all menu links in a new window.
+  navigationNewWindow: true
+
+  # Sidebar configuration.
+  # Disable recent posts section in the sidebar.
+  sidebarRecentLimit: 0
+  # The big, bold text on top of the sidebar.
+  sidebarHeader: Who am I?
+  # Appears directly under the sidebar header.
+  sidebarText: |-
+    I am Parsia, an application security engineer.
+    
+    I write about application security, cryptography, static analysis, and
+    (of course) videogames.
+
+    Click on [About Me!](/about/) to know more.
+
+  # Enable links in the side bar. They are under menu.sidebar.
+  sidebarMenuEnabled: true
+  # Name of the links section.
+  sidebarMenuHeader: Collections
+
+  # Sidebar links
+  # bitbucket: "https://bitbucket.org/parsiya/" # I am not really active on bitbucket.
+  mastodon: "https://infosec.exchange/@parsiya"
+  twitter: "https://twitter.com/cryptogangsta/"
+  # keybase: "https://keybase.io/parsiya/"
+  github: "https://github.com/parsiya/"
+  linkedin: "https://www.linkedin.com/in/parsiya"
+  
+
+  # 404 page. Header and text.
+  notfoundHeader: There's nothing here.
+  notfoundText: You can never go back.
+
+  # Do not display all posts' content on the front page (and in pagination).
+  truncate: true
+
+  # Author's name. Appears in metadata and under posts.
+  author: yangxuze
+
+  # Text that appears in the website header under the website title.
+  subtitle: |-
+    The knowledge of anything, since all things have causes, is not acquired or
+    complete unless it is known by its causes. - Avicenna
+
+  # Search engine URL.
+  searchEngineURL: "https://www.google.com/search"
+
+  # "Continue Reading" text that appears under truncated posts.
+  # continueReadingText: Would you like to know more? # I don't need this, I am using the compact index.
+
+  # # Enable the RSS icon in navigation.
+  rss: true
+
+  description: ""
+  defaultKeywords:
+    - Parsia Hakimian
+    - Parsiya
+    - infosec
+    - information security
+  
+  # Enable table of contents for post by setting this to true. Otherwise, you
+  # can enable/disable them individually via frontmatter.
+  # tableOfContents: false
+
+  # Generate taxonomy list under /categories/ and /tags/
+  generateTaxonomyList: true
+
+  # Twitter card config.
+  # Enable twitter card.
+  twitterCardEnabled: true
+  # Twitter card domain.
+  twitterCardDomain: parsiya.net
+  # Your twitter username, do not include the @.
+  twitterCardAuthor: CryptoGangsta
+  # Not sure what this is used for, but my twitter card works without it.
+  # twitterCardSite = 
+
+  # Use the compact index.
+  compactIndex: true
+
+# markup for Hugo v.60+
 markup:
+  # Note to future me: The reason is because new links in Goldmark are not
+  # opened in a new tab by default. We can use the render hook to make it happen
+  # for just markdown links but not image links or linkify links (i.e., URLs in
+  # the markdown documents as-is). So before you come and waste a lot of time to
+  # switch to Goldmark, don't. Of course, unless this problem has been solved in
+  # Goldmark.
+  # defaultMarkdownHandler: blackfriday # use Blackfriday
+  # blackFriday:
+  #   fractions: false
+  #   hrefTargetBlank: true
+  #   latexDashes: false
+  #   nofollowLinks: true
+  #   smartDashes: false
+  #   smartypants: false
+
+  # Goodbye blackfriday, you have been deprecated.
+  # The render hook is not fired for linkify links in Goldmark so we have to
+  # replace all of them.
+  goldmark:
+    extensions:
+      typographer: false
+    renderer:
+      hardWraps: false
+      unsafe: true
+  
+  # Change the defaults for the toc because I want to render every heading in
+  # the document.
+  tableOfContents:
+    endLevel: 7
+    startLevel: 1
+    # Note to future me: Consider changing the start level to 2 but then you
+    # have to go and change it for every blog post that started with a level 1
+    # heading.
   highlight:
-    noClasses: false
-    # anchorLineNos: true
-    # codeFences: true
-    # guessSyntax: true
-    # lineNos: true
-    # style: monokai
+    # use solarized-dark to highlight code.
+    style: "solarized-dark"

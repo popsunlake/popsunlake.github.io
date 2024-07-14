@@ -1,6 +1,18 @@
+---
+title: kafka服务端-副本同步
+date: 2014-12-22 12:39:04
+tags: [kafka, 服务端, 副本同步]
+categories:
+  - [kafka, 服务端]
+---
+
+
+
 ### 杂
 
 在0.9.0.0之前，Kafka提供了replica lag.max.messages 来控制follower副本最多落后leader副本的消息数量，follower 相对于leader 落后当超过这个数量的时候就判定该follower是失效的，就会踢出ISR，这里的指的是具体的LEO值。
+
+<!-- more -->
 
 对应的Kafka 也针对这些场景提供了一些控制的参数：前面提到的replica.lag.max.message（以数量为标准衡量是否落后），还有以时间为衡量标准的replica.lag.time.max（多久没有向leader 请求数据）
 

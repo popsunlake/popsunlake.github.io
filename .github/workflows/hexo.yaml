@@ -43,6 +43,8 @@ jobs:
           node-version: "18"
       - name: Install Dependencies
         run: npm install
+      - name: Fix Image Paths
+        run: node fix-image-paths.js
       - name: Build with Hexo
         run: npx hexo g
       - name: Upload artifact

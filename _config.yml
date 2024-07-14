@@ -9,9 +9,7 @@ description: 'now or never'
 keywords:
 author: yangxuze
 # language: en
-language:
-  - zh-CN
-  - en
+language: zh-CN
 timezone: ''
 
 # URL

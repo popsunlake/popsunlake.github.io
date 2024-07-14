@@ -12,7 +12,7 @@ produce客户端完整架构图如下所示：
 
 <!-- more -->
 
-![produce客户端完整流程](.\image\produce客户端完整流程.jpg)
+![produce客户端完整流程](E:\github博客\技术博客\source\images\produce客户端\produce客户端完整流程.jpg)
 
 1. ProduceInterceptors对消息进行拦截
 2. Serializer对消息的key和value进行序列化
@@ -38,13 +38,13 @@ private final ConcurrentMap<TopicPartition, Deque<ProducerBatch>> batches;
 
 保存了分区和待发送到该分区上的消息。待发送到该分区上的消息保存在双端队列ArrayDeque中，每个双端队列由数个ProducerBatch组成（RecordBatch是在ProducerBatch里面的一个专门存放消息的对象，除此之外ProducerBatch还有其它相关属性。在架构图中经常用RecordBatch代替ProducerBatch），每个ProducerBatch的大小由配置项batch.size控制，默认为16KB。
 
-![Accumulator图片1](D:\kafka相关\kafka源码整理\produce客户端\图片\Accumulator图片1.png)
+![Accumulator图片1](E:\github博客\技术博客\source\images\produce客户端\Accumulator图片1.png)
 
 追加消息时首先获取分区所属的双端队列，然后取队列中最后一个RecordBatch，如果队列中不存在RecordBatch或者已经不能写入已存在的RecordBatch（比如默认16KB，消息大小为10KB，当写入第二条信息时，发现20KB大于16KB，会不能写入），则创建一个新的RecordBatch。
 
 具体流程如下所示：
 
-![Accumulator图片2](D:\kafka相关\kafka源码整理\produce客户端\图片\Accumulator图片2.png)
+![Accumulator图片2](E:\github博客\技术博客\source\_posts\Accumulator图片2.png)
 
 ## Sender
 
@@ -57,7 +57,7 @@ private final ConcurrentMap<TopicPartition, Deque<ProducerBatch>> batches;
 
 假设有两台服务器，topic有6个分区，单副本，那么每台服务器就有3个分区。如下图所示，如果按照方式1，总共会有6个请求，如果按照方式2，总共会有2个请求。kafka中使用方式2，可以大大减少网络的开销。
 
-![sender图片1](D:\kafka相关\kafka源码整理\produce客户端\图片\sender图片1.png)
+![sender图片1](E:\github博客\技术博客\source\images\produce客户端\sender图片1.png)
 
 Sender的run()方法中主要逻辑主要分为两部分：sendProducerData()和client.poll()。在sendProducerData()中实现，最重要的是这3个方法：
 
@@ -95,7 +95,7 @@ List<PartitionInfo> parts = cluster.partitionsForNode(node.id());
 4. 发送线程通过drain()从记录收集器获取按照节点整理好的List<ProducerBatch>
 5. 发送线程得到每个节点的批记录后，为每个节点创建客户端请求ClientRequest，并将请求发送到服务端
 
-![sender图片2](D:\kafka相关\kafka源码整理\produce客户端\图片\sender图片2.png)
+![sender图片2](E:\github博客\技术博客\source\images\produce客户端\sender图片2.png)
 
 
 
@@ -153,7 +153,7 @@ NetworkClient管理了客户端和服务端之间的网络通信，包括连接�
 
 inFlightRequests变量在客户端缓存了还没有收到响应的客户端请求。InFlightRequests.requests变量的结构为Map<String, Deque<NetworkClient.InFlightRequest>>，key为各个broker，value为发往各个broker的还没有收到响应的请求，用ArrayDeque保存，ArrayDeque的最大长度可通过配置项配置，默认为5。 当收到响应时，该请求会从inFlightRequests中移除。
 
-![NetworkClient图片1](D:\kafka相关\kafka源码整理\produce客户端\图片\NetworkClient图片1.png)
+![NetworkClient图片1](E:\github博客\技术博客\source\images\produce客户端\NetworkClient图片1.png)
 
 在ready()方法和send()方法中均会调用InFlightRequests.canSendMore()来确定当前是否能调用selector.send()方法。能调用的条件是：该broker对应的发送请求队列为空；或者该broker对应的发送请求队列所有的请求都已经发送了且当前请求个数少于5个。
 
@@ -273,11 +273,11 @@ KafkaChannel使用Send和NetworkReceive表示网络传输中发送的请求和�
 
 当选择器调用KafkaChannel的read()和write()方法时，最终会通过NetworkReceive.readFrom()和Send.writeTo()方法调用SocketChannel的read()和write()方法。
 
-![Selector图片1](D:\kafka相关\kafka源码整理\produce客户端\图片\Selector图片1.png)
+![Selector图片1](E:\github博客\技术博客\source\images\produce客户端\Selector图片1.png)
 
 ### 通道上的读写操作
 
-![Selector图片2](D:\kafka相关\kafka源码整理\produce客户端\图片\Selector图片2.png)
+![Selector图片2](E:\github博客\技术博客\source\images\produce客户端\Selector图片2.png)
 
 Sender的run()方法中会调用client.send()，client.send()会调用Selector.send()，继而调用KafkaChannel.setSend（）。客户端发送的每个Send请求，都会被设置到一个Kafka通道中，如果一个Kafka通道上还有未发送成功的Send请求，则后面的请求就不能发送。即客户端发送请求给服务端，在一个Kafka通道中，一次只能发送一个Send请求。KafkaChannel.setSend()还注册了写事件，选择器监听到写事件，会调用KafkaChannel.write()方法，将setSend()保存到Kafka通道中的Send发送到传输层的SocketChannel中。
 

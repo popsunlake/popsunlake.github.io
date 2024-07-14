@@ -3,7 +3,7 @@ title: produce客户端
 date: 2014-12-22 12:39:04
 tags: [kafka, 生产者, 源码剖析]
 categories:
-  - [kafka, 客户端，生产者]
+  - [kafka, 客户端, 生产者]
 ---
 
 

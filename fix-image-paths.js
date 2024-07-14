@@ -6,7 +6,10 @@ const POSTS_DIR = path.join(__dirname, 'source', '_posts');
 function fixImagePath(filePath) {
   const data = fs.readFileSync(filePath, 'utf8');
   const fixedData = data.replace(/!\[([^\]]*)\]\(([^\)]+)\)/g, function(match, alt, src) {
-    let newPath = src.replace(/.*?\\images\\/i, '/images/');
+    // 解码URL，然后替换所有反斜杠为正斜杠
+    let decodedPath = decodeURIComponent(src).replace(/\\/g, '/');
+    // 确保路径以/images/开头
+    let newPath = decodedPath.replace(/.*\/images\//, '/images/');
     return `![${alt}](${newPath})`;
   });
   fs.writeFileSync(filePath, fixedData, 'utf8');

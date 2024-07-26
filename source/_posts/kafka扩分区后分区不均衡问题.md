@@ -1,8 +1,20 @@
+---
+title: kafka分区不均衡问题排查
+date: 2014-12-22 12:39:04
+tags: [kafka, bugs, 分区]
+categories:
+  - [kafka, 问题]
+---
+
+
+
 ### 问题现象
 
 版本：2.7.2
 
 3个broker的环境。创建副本为1，分区为2的topic，然后扩容到3分区，3个分区没有均匀分布到3个broker上。
+
+<!-- more -->
 
 ```shell
 # 创建1副本，2分区的topic

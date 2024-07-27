@@ -8,13 +8,11 @@ categories:
 
 
 
-## linux中编译运行
-
 ### gradle编译遇到的问题
 
-执行`./gradlew jar`，报错：
+#### gradle-wrapper.jar包
 
-<!-- more -->
+执行`./gradlew jar`，报错：
 
 ```shell
 [root@compiler-compiler-0 kafka]# ./gradlew jar
@@ -42,7 +40,7 @@ done
 
 
 
-
+#### gradle程序下载地址
 
 执行./gradlew jar，报错：
 
@@ -63,9 +61,7 @@ Exception in thread "main" java.net.UnknownHostException: services.gradle.org
 +distributionUrl=https\://mirrors.dahuatech.com/gradle/gradle-8.8-all.zip
 ```
 
-
-
-
+#### gradle镜像地址
 
 执行./gradlew jar，报错：无法在仓库中找到[id: 'com.gradle.enterprise', version: '3.14.1']这个plugin
 
@@ -129,7 +125,37 @@ diff --git a/build.gradle b/build.gradle
    }
 ```
 
-阿里云仓库地址详见：https://developer.aliyun.com/mvn/guide
+若在外部ecs实例上，比如阿里云或华为云上，则上面的镜像地址相应改为：
+
+gradle/wrapper/gradle-wrapper.properties:
+
+```shell
+distributionUrl=https\://mirrors.aliyun.com/macports/distfiles/gradle/gradle-8.8-all.zip
+```
+
+settings.gradle:
+
+```shell
+pluginManagement {
+    repositories {
+       maven {
+              url 'http://maven.aliyun.com/repository/gradle-plugin'
+              allowInsecureProtocol = true
+            }
+    }
+}
+```
+
+build.gradle:
+
+```shell
+maven {
+	url 'http://maven.aliyun.com/repository/public'
+	allowInsecureProtocol = true
+}
+```
+
+
 
 ### 编译构建命令
 
@@ -142,6 +168,8 @@ diff --git a/build.gradle b/build.gradle
 
 
 ### 运行
+
+#### 单kafka实例
 
 可以直接从官网下载产物包（https://www.apache.org/dyn/closer.cgi?path=/kafka/3.7.1/kafka_2.13-3.7.1.tgz）
 
@@ -182,7 +210,7 @@ diff --git a/build.gradle b/build.gradle
    rm -rf /tmp/kafka-logs /tmp/zookeeper /tmp/kraft-combined-logs
    ```
 
-
+#### 多kafka实例
 
 如果想在一台机器上运行3个kafka实例，可以参照下面步骤进行：
 

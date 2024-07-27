@@ -1,4 +1,77 @@
+---
+title: kafka社区贡献指南
+date: 2014-12-22 12:39:04
+tags: [kafka, 社区, jira]
+categories:
+  - [kafka, 社区]
+---
+
 参考：[Apache Kafka](https://kafka.apache.org/contributing.html)
+
+可以只看第一部分的汇总，后面的是对官方文档的翻译整理
+
+## 汇总
+
+### 账号和权限
+
+<!-- more -->
+
+* 如果没有jira账号，则申请账号，[ASF Self-serve Portal - The Apache Software Foundation](https://selfserve.apache.org/jira-account.html)
+
+* 订阅CONTACT中的4个地址，向4个收件地址发邮件（内容任意）；之后会有确认邮件，再发一遍到邮件中指定的地址即可（内容任意）；最后会收到欢迎邮件，说明订阅成功：
+
+  ![订阅发邮件](E:\github博客\技术博客\source\images\kafka社区贡献指南\订阅发邮件.png)
+
+* 向[users@kafka.apache.org](mailto:users@kafka.apache.org)发一封邮件，申请成为contributor（这样就可以更新jira状态，包括assign等高级功能）
+
+  ![申请成为contributor的邮件]( E:\github博客\技术博客\source\images\kafka社区贡献指南\申请成为contributor的邮件.png)
+
+* 到这一步，已经可以创建jira并分配给自己，也可以认领别人的jira来完成。https://issues.apache.org/jira/issues/?jql=project = KAFKA AND labels = newbie AND status = Open 。这个链接中的是专供新手练手的单子。
+
+* 在https://issues.apache.org/jira/browse/INFRA-25451添加一条评论，申请开通wiki/confluence的注册权限（当前不能通过页面进行注册，正在修复）。
+
+* 等wiki账号注册后，向[users@kafka.apache.org](mailto:users@kafka.apache.org)发邮件申请开通权限，这样就可以编辑wiki页面了。
+
+### 实际操作例子
+
+可以到https://issues.apache.org/jira/issues/?jql=project = KAFKA AND labels = newbie AND status = Open这个地址找一个简单的问题开始练手。
+
+认领了一个单子：[[KAFKA-15630\] Improve documentation of offset.lag.max - ASF JIRA (apache.org)](https://issues.apache.org/jira/browse/KAFKA-15630)，需求是扩展某个参数的说明。下面是具体步骤：
+
+1. 从kafka官方fork仓库
+2. 创建分支KAFKA-15630
+3. 修改提交，发起PR
+4. github会自动构建，构建完成会显示失败的测试用例
+5. 分析失败的测试用例，看日志或本地重跑复现
+
+我提交后，显示有4个用例失败：
+
+![操作例子-失败用例](E:\github博客\技术博客\source\images\kafka社区贡献指南\操作例子-失败用例.png)
+
+在本地重跑全部通过：
+
+```shell
+./gradlew core:test --tests SaslPlainPlaintextConsumerTest
+./gradlew core:test --tests UserQuotaTest
+./gradlew metadata:test --tests QuorumControllerTest
+./gradlew streams:test --tests ResetIntegrationWithSslTest
+```
+
+
+
+### 如何成为committer
+
+后文的“BECOMING A COMMITTER”写了成为committer的条件，但是比较虚，都是比较抽象的一些条件。
+
+有一个比较实际的评判标准，就是量化贡献度，下面具体来讲一下。
+
+事情的起因是infra项目提供了一种能力，通过在.asf.yaml中设置白名单，可以授予一些用户committer才能有的权利，以帮助committer分担工作量，白名单的上限是10人，这些人员的选拔标准是看过去一年的commit数量（git shortlog --email --numbered --summary --since=2022-04-28），committer基本会在这些人员中产生。详情参考[[DISCUSS\] Adding non-committers as Github collaborators-Apache Mail Archives](https://lists.apache.org/thread/93lb6jhkjkmb9op9629xt6c6olwym28c)
+
+在最近一次更新.asf.yaml文件的时候，统计的方式变了，因为存在相同邮箱多用户和相同用户多邮箱的情况，根据git shortlog的统计可能不准，换成了通过github提供的贡献量界面为准，这样相同github账号提供的commit数量就能正确统计了。（统计链接见[Contributors to apache/kafka (github.com)](https://github.com/apache/kafka/graphs/contributors?from=2023-07-24&to=2024-07-24&type=c)）（相关讨论见[MINOR: Update collaborators list by jlprat · Pull Request #16679 · apache/kafka (github.com)](https://github.com/apache/kafka/pull/16679)和[[KAFKA-14995\] Automate asf.yaml collaborators refresh - ASF JIRA (apache.org)](https://issues.apache.org/jira/browse/KAFKA-14995)）
+
+最近新增的9人，最少的一人过去一年也贡献了29个commit：
+
+![github统计贡献数量](E:\github博客\技术博客\source\images\kafka社区贡献指南\github统计贡献数量.png)
 
 ## HOW TO CONTRIBUTE
 
@@ -18,26 +91,6 @@ KIP地址：https://cwiki.apache.org/confluence/display/KAFKA/Kafka+Improvement+
 wiki地址（包括KIP、文档等各种入口）：[Index - Apache Kafka - Apache Software Foundation](https://cwiki.apache.org/confluence/display/KAFKA/Index)
 
 wiki页面可以直接修改，需要授权，向dev@kafka.apache.org和[users@kafka.apache.org](mailto:users@kafka.apache.org)发邮件即可（[Contributing Website Documentation Changes - Apache Kafka - Apache Software Foundation](https://cwiki.apache.org/confluence/display/KAFKA/Contributing+Website+Documentation+Changes)）（当前账号登不进去）
-
-可以只看第一部分的步骤，后面的是对官方文档的翻译整理
-
-### 步骤
-
-* 如果没有jira账号，则申请账号，[ASF Self-serve Portal - The Apache Software Foundation](https://selfserve.apache.org/jira-account.html)
-
-* 订阅CONTACT中的4个地址，向4个收件地址发邮件（内容任意）；之后会有确认邮件，再发一遍到邮件中指定的地址即可（内容任意）；最后会收到欢迎邮件，说明订阅成功：
-
-  ![订阅发邮件](E:\github博客\技术博客\source\images\kafka社区贡献指南\订阅发邮件.png)
-
-* 向[users@kafka.apache.org](mailto:users@kafka.apache.org)发一封邮件，申请成为contributor（这样就可以更新jira状态，包括assign等高级功能）
-
-  ![申请成为contributor的邮件](E:\github博客\技术博客\source\images\kafka社区贡献指南\申请成为contributor的邮件.png)
-
-* 到这一步，已经可以创建jira并分配给自己，也可以认领别人的jira来完成。https://issues.apache.org/jira/issues/?jql=project = KAFKA AND labels = newbie AND status = Open 。这个链接中的是专供新手练手的单子。
-
-* 在https://issues.apache.org/jira/browse/INFRA-25451添加一条评论，申请开通wiki/confluence的注册权限（当前不能通过页面进行注册，正在修复）。
-
-* 等wiki账号注册后，向[users@kafka.apache.org](mailto:users@kafka.apache.org)发邮件申请开通权限，这样就可以编辑wiki页面了。
 
 ### CONTACT
 

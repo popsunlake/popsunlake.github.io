@@ -1,8 +1,20 @@
+---
+title: kafka编译运行
+date: 2014-12-22 12:39:04
+tags: [kafka, 编译, 运行]
+categories:
+  - [kafka, 运维]
+---
+
+
+
 ## linux中编译运行
 
 ### gradle编译遇到的问题
 
 执行`./gradlew jar`，报错：
+
+<!-- more -->
 
 ```shell
 [root@compiler-compiler-0 kafka]# ./gradlew jar

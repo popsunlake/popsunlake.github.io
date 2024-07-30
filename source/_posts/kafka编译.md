@@ -14,6 +14,8 @@ categories:
 
 执行`./gradlew jar`，报错：
 
+<!-- more -->
+
 ```shell
 [root@compiler-compiler-0 kafka]# ./gradlew jar
 curl: (6) Could not resolve host: raw.githubusercontent.com; Name or service not known
@@ -165,11 +167,11 @@ maven {
 ./gradlew clean releaseTarGz
 ```
 
-
-
 ### 运行
 
-#### 单kafka实例
+#### 不带zk
+
+##### 单kafka实例
 
 可以直接从官网下载产物包（https://www.apache.org/dyn/closer.cgi?path=/kafka/3.7.1/kafka_2.13-3.7.1.tgz）
 
@@ -193,28 +195,12 @@ maven {
    bin/kafka-server-start.sh config/kraft/server.properties
    ```
 
-3. 使用
 
-   ```shell
-   # 创建一个topic
-   bin/kafka-topics.sh --create --topic quickstart-events --bootstrap-server localhost:9092
-   # 显示topic详情
-   bin/kafka-topics.sh --describe --topic quickstart-events --bootstrap-server localhost:9092
-   # 生产
-   bin/kafka-console-producer.sh --topic quickstart-events --bootstrap-server localhost:9092
-   # 消费
-   bin/kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server localhost:9092
-   # kafka connect操作（todo）
-   # kafka streams操作（todo）
-   # 结束（因为都是前台起的，直接crtl+c即可）
-   rm -rf /tmp/kafka-logs /tmp/zookeeper /tmp/kraft-combined-logs
-   ```
-
-#### 多kafka实例
+##### 多kafka实例
 
 如果想在一台机器上运行3个kafka实例，可以参照下面步骤进行：
 
-1. 在config/kraft下新建3个配置文件server1.properties、
+1. 在config/kraft下新建3个配置文件server1.properties、server2.properties、server3.properties
 
    ```
    process.roles=broker,controller
@@ -270,3 +256,128 @@ maven {
 
    
 
+#### 带zk
+
+##### 单kafka实例
+
+1. 启动zk
+
+   ```shell
+   bin/zookeeper-server-start.sh config/zookeeper.properties
+   ```
+
+2. 启动kafka
+
+   ```
+   bin/kafka-server-start.sh config/server.properties
+   ```
+
+   
+
+##### 多kafka实例
+
+1. 启动zk
+
+   ```shell
+   bin/zookeeper-server-start.sh config/zookeeper.properties
+   ```
+
+2. 在config下新建3个配置文件server1.properties、server2.properties、server3.properties
+
+   ```
+   broker.id=0
+   listeners=PLAINTEXT://localhost:9092
+   log.dirs=/tmp/kafka-logs-0
+   zookeeper.connect=localhost:2181
+   ```
+
+   ```
+   broker.id=1
+   listeners=PLAINTEXT://localhost:9093
+   log.dirs=/tmp/kafka-logs-1
+   zookeeper.connect=localhost:2181
+   ```
+
+   ```
+   broker.id=2
+   listeners=PLAINTEXT://localhost:9094
+   log.dirs=/tmp/kafka-logs-2
+   zookeeper.connect=localhost:2181
+   ```
+
+   
+
+3. 启动kafka
+
+   ```shell
+   bin/kafka-server-start.sh config/server1.properties
+   bin/kafka-server-start.sh config/server2.properties
+   bin/kafka-server-start.sh config/server3.properties
+   ```
+
+   
+
+#### 使用验证
+
+1. 创建一个topic
+
+   ```shell
+   bin/kafka-topics.sh --create --topic quickstart-events --bootstrap-server localhost:9092
+   ```
+
+2. 显示topic详情
+
+   ```shell
+   bin/kafka-topics.sh --describe --topic quickstart-events --bootstrap-server localhost:9092
+   ```
+
+3. 生产
+
+   ```shell
+   bin/kafka-console-producer.sh --topic quickstart-events --bootstrap-server localhost:9092
+   ```
+
+4. 消费
+
+   ```shell
+   bin/kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server localhost:9092
+   ```
+
+5. kafka connect操作（例子：将文件中的数据导入kafka；将kafka中的数据导出文件）
+
+   * 在connect-standalone.properties文件中指定连接jar包
+
+     ```shell
+     echo "plugin.path=libs/connect-file-3.9.0-SNAPSHOT.jar" >> config/connect-standalone.properties
+     ```
+
+   * 创建一个内容文件
+
+     ```shell
+     echo -e "foo\nbar" > test.txt
+     ```
+
+   * 运行一个导入和导出进程
+
+     ```shell
+     bin/connect-standalone.sh config/connect-standalone.properties config/connect-file-source.properties config/connect-file-sink.properties
+     ```
+
+   * 导入进程会将test.txt数据写入connect-test这个topic中。导出进程会将connect-test这个topic中的数据写入test.sink.txt文件中
+
+     ```shell
+     # 查看topic中内容
+     bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic connect-test --from-beginning
+     # 查看导出文件内容
+     more test.sink.txt
+     ```
+
+6. kafka streams操作（略）
+
+7. 结束（清理相关目录，供下次拉起）
+
+   ```shell
+   rm -rf /tmp/kafka-logs /tmp/zookeeper /tmp/kraft-combined-logs
+   ```
+
+   

@@ -2281,3 +2281,13 @@ rebalance相关场景？
 ![位移提交流程](E:\github博客\技术博客\source\images\kafka消费者组\位移提交流程.png)
 
  
+
+重要参数？
+
+heartbeat.interval.ms：消费者心跳间隔时间，默认3s
+
+session.timeout.ms：如果一个消费者发生崩溃，那么GroupCoordinator会等待一小段时间，确认这个消费者死亡后才会触发再均衡，这一小段时间由session.timeout.ms控制，该参数必须在group.min.session.timeout.ms（默认6s）和group.max.session.timeout.ms（默认5min）之间。默认10s
+
+max.poll.interval.ms：两次poll之间的最大间隔，如果大于这个间隔，则消费者被视为失败，会触发rebalance，另外在joinGroup的时候，GroupCoordinator使用该参数作为等待各个消费者加入的最长等待时间。默认5min。
+
+connection.max.idle.ms：最大空闲时间，大于该值后关闭连接。默认9min。注意和上面参数的区别。

@@ -14,13 +14,26 @@ categories:
 
 <!-- more -->
 
-前面介绍过的kafka脚本，内部实现都是通过调用AdminUtils类实现的。
+前面介绍过的kafka脚本，内部实现都是通过调用AdminUtils类实现的（2.0.1是，2.7.2根据参数不同支持AdminUtils和KafkaAdminClient）。
 
 在自己的项目中想实现kafka的管理，一般都会使用KafkaAdminClient。
 
 以创建topic为例，可以通过kafka-topics.sh完成该操作，内部是通过调用AdminUtils类完成分配动作，并最终写入zk。也可以调用KafkaAdminClient类的createTopics方法来完成，服务端KafkaApis会接收到CreateTopicsRequest，并最终调用AdminUtils类来完成分配动作，并最终写入zk。
 
 KafkaAdminClient是否能实现所有工具脚本中的功能？
+
+## 整体流程
+
+周期性更新元数据。
+
+将请求放入一个队列中，一个专门的线程从队列中取出请求进行处理。
+
+根据请求的不同，发往不同的节点进行处理（在构造的Call中就确定了要发往哪个节点）。有四种确定节点的方式的：
+
+* ConstantNodeIdProvider：指定发送到的节点
+* ControllerNodeProvider：Controller节点
+* LeastLoadedNodeProvider：负载最少的节点
+* MetadataUpdateNodeIdProvider：元数据节点，会选负载最少的节点
 
 
 

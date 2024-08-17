@@ -39,7 +39,7 @@ case class MemberSummary(memberId: String,
 
 可以看到，这个类定义了 6 个字段，下面详细解释。
 
-* memberId：标识消费者组成员的 ID，这个 ID 是 Kafka 自动生成的，规则是consumer- 组 ID-< 序号 >-。虽然现在社区有关于是否放开这个限制的讨论，即是否允许用户自己设定这个 ID，但目前它还是硬编码的，不能让你设置。
+* memberId：标识消费者组成员的 ID，这个 ID 是 Kafka 自动生成的，规则是consumer- 组 ID-< 序号 >-（应该是clientId-UUID）。虽然现在社区有关于是否放开这个限制的讨论，即是否允许用户自己设定这个 ID，但目前它还是硬编码的，不能让你设置。
 
 * groupInstanceId：消费者组静态成员的 ID。静态成员机制的引入能够规避不必要的消费者组 Rebalance 操作。它是2.4.0版本引入的，是高阶的功能。源码中对这个参数的释义为：
 

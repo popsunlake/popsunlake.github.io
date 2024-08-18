@@ -320,7 +320,7 @@ sendResponse 方法的逻辑其实非常简单。
 
 在深入学习 Kafka 各个网络组件之前，我们先从整体上看一下完整的网络通信层架构，如下图所示：
 
-![整体流程图](D:\kafka相关\kafka源码整理\kafka服务端-请求处理模块\整体流程图.webp)
+![整体流程图](E:\github博客\技术博客\source\images\kafka服务端-请求处理模块\整体流程图.webp)
 
 可以看出，Kafka 网络通信组件主要由两大部分构成：SocketServer 和 KafkaRequestHandlerPool。
 
@@ -833,3 +833,672 @@ case class EndPoint(host: String, port: Int, listenerName: ListenerName, securit
 }
 ```
 
+每个 EndPoint 对象定义了 4 个属性，我们分别来看下。
+
+* host：Broker 主机名。
+* port：Broker 端口号。
+* listenerName：监听器名字。目前预定义的名称包括 PLAINTEXT、SSL、SASL_PLAINTEXT 和 SASL_SSL。Kafka 允许你自定义其他监听器名称，比如 CONTROLLER、INTERNAL 等。
+* securityProtocol：监听器使用的安全协议。Kafka 支持 4 种安全协议，分别是 PLAINTEXT、SSL、SASL_PLAINTEXT 和 SASL_SSL。
+
+我举个例子，如果 Broker 端相应参数配置如下：
+
+```properties
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:SSL
+listeners=CONTROLLER://192.1.1.8:9091,INTERNAL://192.1.1.8:9092,EXTERNAL://10.1.1.5:9093
+```
+
+那么，这就表示，Kafka 配置了 3 套监听器，名字分别是 CONTROLLER、INTERNAL 和 EXTERNAL，使用的安全协议分别是 PLAINTEXT、PLAINTEXT 和 SSL。
+
+有了这些基础知识，接下来，我们就可以看一下 SocketServer 是如何实现 Data plane 与 Control plane 的分离的。
+
+当然，在此之前，我们要先了解下 SocketServer 的定义。
+
+#### ScocketServer中和请求优先级相关的属性
+
+```scala
+class SocketServer(val config: KafkaConfig, 
+  val metrics: Metrics,
+  val time: Time,  
+  val credentialProvider: CredentialProvider) 
+  extends Logging with KafkaMetricsGroup with BrokerReconfigurable {
+  // SocketServer实现BrokerReconfigurable trait表明SocketServer的一些参数配置是允许动态修改的
+  // 即在Broker不停机的情况下修改它们
+  // SocketServer的请求队列长度，由Broker端参数queued.max.requests值而定，默认值是500
+  private val maxQueuedRequests = config.queuedMaxRequests
+  ......
+  // data-plane
+  private val dataPlaneProcessors = new ConcurrentHashMap[Int, Processor]() // 处理数据类请求的Processor线程池
+  // 处理数据类请求的Acceptor线程池，每套监听器对应一个Acceptor线程
+  private[network] val dataPlaneAcceptors = new ConcurrentHashMap[EndPoint, Acceptor]()
+  // 处理数据类请求专属的RequestChannel对象
+  val dataPlaneRequestChannel = new RequestChannel(maxQueuedRequests, DataPlaneMetricPrefix)
+      
+  // control-plane
+  // 用于处理控制类请求的Processor线程
+  // 注意：目前定义了专属的Processor线程而非线程池处理控制类请求
+  private var controlPlaneProcessorOpt : Option[Processor] = None
+  // 处理控制类请求的Acceptor
+  private[network] var controlPlaneAcceptorOpt : Option[Acceptor] = None
+  // 处理控制类请求专属的RequestChannel对象，长度固定为20
+  val controlPlaneRequestChannelOpt: Option[RequestChannel] = config.controlPlaneListenerName.map(_ => new RequestChannel(20, ControlPlaneMetricPrefix))
+  ......
+}
+```
+
+首先，SocketServer 类定义了一个 maxQueuedRequests 字段，它定义了请求队列的最大长度。默认值是 Broker 端 queued.max.requests 参数值。
+
+其次，在上面的代码中，你一定看到了 SocketServer 实现了 BrokerReconfigurable 接口（在 Scala 中是 trait）。这就说明，SocketServer 中的某些配置，是允许动态修改值的。如果查看 SocketServer 伴生对象类的定义的话，你能找到下面这些代码：
+
+```scala
+object SocketServer {
+  ......
+  val ReconfigurableConfigs = Set(
+    KafkaConfig.MaxConnectionsPerIpProp,
+    KafkaConfig.MaxConnectionsPerIpOverridesProp,
+    KafkaConfig.MaxConnectionsProp,
+    KafkaConfig.MaxConnectionCreationRateProp)
+  ......
+}
+```
+
+根据这段代码，我们可以知道，Broker 端参数 max.connections.per.ip、max.connections.per.ip.overrides 和 max.connections、max.connection.creation.rate 是可以动态修改的。
+
+另外，在我们刚刚看的 SocketServer 定义的那段代码中，Data plane 和 Control plane 注释下面分别定义了一组变量，即 Processor 线程池、Acceptor 线程池和 RequestChannel 实例。
+
+* Processor 线程池：即上节课提到的网络线程池，负责将请求高速地放入到请求队列中。
+* Acceptor 线程池：保存了 SocketServer 为每个监听器定义的 Acceptor 线程，此线程负责分发该监听器上的入站连接建立请求。
+* RequestChannel：承载请求队列的请求处理通道。
+
+严格地说，对于 Data plane 来说，线程池的说法是没有问题的，因为 Processor 线程确实有很多个，而 Acceptor 也可能有多个，因为 SocketServer 会为每个 EndPoint（即每套监听器）创建一个对应的 Acceptor 线程。
+
+但是，对于 Control plane 而言，情况就不一样了。
+
+细心的你一定发现了，Control plane 那组属性变量都是以 Opt 结尾的，即它们都是 Option 类型。这说明了一个重要的事实：你完全可以不使用 Control plane 套装，即你可以让 Kafka 不区分请求类型，就像 2.2.0 之前设计的那样。
+
+但是，一旦你开启了 Control plane 设置，其 Processor 线程就只有 1 个，Acceptor 线程也是 1 个。另外，你要注意，它对应的 RequestChannel 里面的请求队列长度被硬编码成了 20，而不是一个可配置的值。这揭示了社区在这里所做的一个假设：即控制类请求的数量应该远远小于数据类请求，因而不需要为它创建线程池和较深的请求队列。
+
+#### 创建 Data plane 所需资源
+
+知道了 SocketServer 类的定义之后，我们就可以开始学习 SocketServer 是如何为 Data plane 和 Control plane 创建所需资源的操作了。我们先来看为 Data plane 创建资源。
+
+SocketServer 的 createDataPlaneAcceptorsAndProcessors 方法负责为 Data plane 创建所需资源。我们看下它的实现：
+
+```scala
+private def createDataPlaneAcceptorsAndProcessors(
+  dataProcessorsPerListener: Int, endpoints: Seq[EndPoint]): Unit = {
+  // 遍历监听器集合
+  endpoints.foreach { endpoint =>
+    // 将监听器纳入到连接配额管理之下
+    connectionQuotas.addListener(config, endpoint.listenerName)
+    // 为监听器创建对应的Acceptor线程
+    val dataPlaneAcceptor = createAcceptor(endpoint, DataPlaneMetricPrefix)
+    // 为监听器创建多个Processor线程。具体数目由num.network.threads决定
+    addDataPlaneProcessors(dataPlaneAcceptor, endpoint, dataProcessorsPerListener)
+    // 将<监听器，Acceptor线程>对保存起来统一管理
+    dataPlaneAcceptors.put(endpoint, dataPlaneAcceptor)
+    info(s"Created data-plane acceptor and processors for endpoint : ${endpoint.listenerName}")
+  }
+}
+```
+
+createDataPlaneAcceptorsAndProcessors 方法会遍历你配置的所有监听器，然后为每个监听器执行下面的逻辑。
+
+* 初始化该监听器对应的最大连接数计数器。后续这些计数器将被用来确保没有配额超限的情形发生。
+* 为该监听器创建 Acceptor 线程，也就是调用 Acceptor 类的构造函数，生成对应的 Acceptor 线程实例。
+* 创建 Processor 线程池。对于 Data plane 而言，线程池的数量由 Broker 端参数 num.network.threads 决定。
+* 将 < 监听器，Acceptor 线程 > 对加入到 Acceptor 线程池统一管理。
+
+举个例子，假设你配置 listeners=PLAINTEXT://localhost:9092, SSL://localhost:9093，那么在默认情况下，源码会为 PLAINTEXT 和 SSL 这两套监听器分别创建一个 Acceptor 线程和一个 Processor 线程池。**单个Processor 线程池中线程的数量就是num.network.threads**。
+
+需要注意的是，具体为哪几套监听器创建是依据配置而定的，最重要的是，Kafka 只会为 Data plane 所使的监听器创建这些资源。至于如何指定监听器到底是为 Data plane 所用，还是归 Control plane，我会再详细说明。
+
+#### 创建 Control plane 所需资源
+
+前面说过了，基于控制类请求的负载远远小于数据类请求负载的假设，Control plane 的配套资源只有 1 个 Acceptor 线程 + 1 个 Processor 线程 + 1 个深度是 20 的请求队列而已。和 Data plane 相比，这些配置稍显寒酸，不过在大部分情况下，应该是够用了。
+
+SocketServer 提供了 createControlPlaneAcceptorAndProcessor 方法，用于为 Control plane 创建所需资源，源码如下：
+
+```scala
+private def createControlPlaneAcceptorAndProcessor(
+  endpointOpt: Option[EndPoint]): Unit = {
+  // 如果为Control plane配置了监听器
+  endpointOpt.foreach { endpoint =>
+    // 将监听器纳入到连接配额管理之下
+    connectionQuotas.addListener(config, endpoint.listenerName)
+    // 为监听器创建对应的Acceptor线程
+    val controlPlaneAcceptor = createAcceptor(endpoint, ControlPlaneMetricPrefix)
+    // 为监听器创建对应的Processor线程
+    val controlPlaneProcessor = newProcessor(nextProcessorId, controlPlaneRequestChannelOpt.get, connectionQuotas, endpoint.listenerName, endpoint.securityProtocol, memoryPool)
+    controlPlaneAcceptorOpt = Some(controlPlaneAcceptor)
+    controlPlaneProcessorOpt = Some(controlPlaneProcessor)
+    val listenerProcessors = new ArrayBuffer[Processor]()
+    listenerProcessors += controlPlaneProcessor
+    // 将Processor线程添加到控制类请求专属RequestChannel中
+    // 即添加到RequestChannel实例保存的Processor线程池中
+    controlPlaneRequestChannelOpt.foreach(
+      _.addProcessor(controlPlaneProcessor))
+    nextProcessorId += 1
+    // 把Processor对象也添加到Acceptor线程管理的Processor线程池中
+    controlPlaneAcceptor.addProcessors(listenerProcessors, ControlPlaneThreadPrefix)
+    info(s"Created control-plane acceptor and processor for endpoint : ${endpoint.listenerName}")
+  }
+}
+
+```
+
+总体流程和 createDataPlaneAcceptorsAndProcessors 非常类似，只是方法开头需要判断是否配置了用于 Control plane 的监听器。目前，Kafka 规定只能有 1 套监听器用于 Control plane，而不能像 Data plane 那样可以配置多套监听器。
+
+如果认真看的话，你会发现，上面两张图中都没有提到启动 Acceptor 和 Processor 线程。那这些线程到底是在什么时候启动呢？
+
+实际上，Processor 和 Acceptor 线程是在启动 SocketServer 组件之后启动的，具体代码在 KafkaServer.scala 文件的 startup 方法中，如下所示：
+
+```scala
+// KafkaServer.scala
+def startup(): Unit = {
+    try {
+      info("starting")
+      ......
+      // 创建SocketServer组件
+      socketServer = new SocketServer(config, metrics, time, credentialProvider)
+      // 启动SocketServer，但不启动Processor线程
+      socketServer.startup(startProcessingRequests = false)
+      ......
+      // 启动Data plane和Control plane的所有线程
+      socketServer.startProcessingRequests(authorizerFutures)
+      ......
+    } catch {
+      ......
+    }
+}
+```
+
+SocketServer 的 startProcessingRequests 方法就是启动这些线程的方法。我们看下这个方法的逻辑：
+
+```scala
+def startProcessingRequests(authorizerFutures: Map[Endpoint, CompletableFuture[Void]] = Map.empty): Unit = {
+  info("Starting socket server acceptors and processors")
+  this.synchronized {
+    if (!startedProcessingRequests) {
+      // 启动处理控制类请求的Processor和Acceptor线程
+      startControlPlaneProcessorAndAcceptor(authorizerFutures)
+      // 启动处理数据类请求的Processor和Acceptor线程
+      startDataPlaneProcessorsAndAcceptors(authorizerFutures)
+      startedProcessingRequests = true
+    } else {
+      info("Socket server acceptors and processors already started")
+    }
+  }
+  info("Started socket server acceptors and processors")
+}
+```
+
+这个方法又进一步调用了 startDataPlaneProcessorsAndAcceptors 和 startControlPlaneProcessorAndAcceptor 方法分别启动 Data plane 的 Control plane 的线程。鉴于这两个方法的逻辑类似，我们重点学习下 startDataPlaneProcessorsAndAcceptors 方法的实现。
+
+```scala
+private def startDataPlaneProcessorsAndAcceptors(
+  authorizerFutures: Map[Endpoint, CompletableFuture[Void]]): Unit = {
+  // 获取Broker间通讯所用的监听器，默认是PLAINTEXT
+  val interBrokerListener = dataPlaneAcceptors.asScala.keySet
+    .find(_.listenerName == config.interBrokerListenerName)
+    .getOrElse(throw new IllegalStateException(s"Inter-broker listener ${config.interBrokerListenerName} not found, endpoints=${dataPlaneAcceptors.keySet}"))
+  val orderedAcceptors = List(dataPlaneAcceptors.get(interBrokerListener)) ++
+    dataPlaneAcceptors.asScala.filter { case (k, _) => k != interBrokerListener }.values
+  orderedAcceptors.foreach { acceptor =>
+    val endpoint = acceptor.endPoint
+    // 启动Processor和Acceptor线程
+    startAcceptorAndProcessors(DataPlaneThreadPrefix, endpoint, acceptor, authorizerFutures)
+  }
+}
+```
+
+该方法主要的逻辑是调用 startAcceptorAndProcessors 方法启动 Acceptor 和 Processor 线程。当然在此之前，代码要获取 Broker 间通讯所用的监听器，并找出该监听器对应的 Acceptor 线程以及它维护的 Processor 线程池。
+
+好了，现在我要告诉你，到底是在哪里设置用于 Control plane 的监听器了。Broker 端参数 control.plane.listener.name，就是用于设置 Control plane 所用的监听器的地方。
+
+在默认情况下，这个参数的值是空（Null）。Null 的意思就是告诉 Kafka 不要启用请求优先级区分机制，但如果你设置了这个参数，Kafka 就会利用它去 listeners 中寻找对应的监听器了。
+
+我举个例子说明下。假设你的 Broker 端相应配置如下：
+
+```scala
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:SSL
+
+listeners=CONTROLLER://192.1.1.8:9091,INTERNAL://192.1.1.8:9092,EXTERNAL://10.1.1.5:9093
+
+control.plane.listener.name=CONTROLLER
+```
+
+那么，名字是 CONTROLLER 的那套监听器将被用于 Control plane。换句话说，名字是 INTERNAL 和 EXTERNAL 的这两组监听器用于 Data plane。在代码中，Kafka 是如何知道 CONTROLLER 这套监听器是给 Control plane 使用的呢？简单来说，这是通过 KafkaConfig 中的 3 个方法完成的。KafkaConfig 类封装了 Broker 端所有参数的信息，同时还定义了很多实用的工具方法。
+
+讲到这里，Data plane 和 Control plane 的内容我就说完了。现在我再来具体解释下它们和请求优先级之间的关系。
+
+严格来说，Kafka 没有为请求设置数值型的优先级，因此，我们并不能把所有请求按照所谓的优先级进行排序。到目前为止，Kafka 仅仅实现了粗粒度的优先级处理，即整体上把请求分为数据类请求和控制类请求两类，而且没有为这两类定义可相互比较的优先级。那我们应该如何把刚刚说的所有东西和这里的优先级进行关联呢？
+
+通过刚刚的学习，我们知道，社区定义了多套监听器以及底层处理线程的方式来区分这两大类请求。虽然我们很难直接比较这两大类请求的优先级，但在实际应用中，由于数据类请求的数量要远多于控制类请求，因此，为控制类请求单独定义处理资源的做法，实际上就等同于拔高了控制类请求的优先处理权。从这个角度上来说，这套做法间接实现了优先级的区别对待。
+
+#### 总结
+
+data-plane处理常见的请求，control-plane处理上面提到的3种控制类的请求
+
+以一个例子说明：
+
+```properties
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:SSL
+
+listeners=CONTROLLER://192.1.1.8:9091,INTERNAL://192.1.1.8:9092,EXTERNAL://10.1.1.5:9093
+
+control.plane.listener.name=CONTROLLER
+```
+
+control.plane.listener.name指定是否启用control-plane（该参数默认为null）。
+
+通过control.plane.listener.name确定listeners中哪些是control-plane的listener，哪些是data-plane的listener。具体到这里：
+
+* control-plane：`CONTROLLER://192.1.1.8:9091`
+* data-plane：`INTERNAL://192.1.1.8:9092,EXTERNAL://10.1.1.5:9093`
+
+两种类型的listener分配的acceptor线程个数和processor线程个数分别如下：
+
+control对应的listener：1个acceptor和1个processor
+
+data对应的listener：1个acceptor和`num.network.threads`个processor（一个listener的数量，多个则翻倍）
+
+
+## KafkaRequestHandler
+
+num.io.threads 参数表征的就是 I/O 线程池的大小。所谓的 I/O 线程池，即 KafkaRequestHandlerPool，也称请求处理线程池。这节课我会先讲解 KafkaRequestHandlerPool 源码，再具体解析请求处理全流程的代码。
+
+KafkaRequestHandlerPool 是真正处理 Kafka 请求的地方。切记，Kafka 中处理请求的类不是 SocketServer，也不是 RequestChannel，而是 KafkaRequestHandlerPool。
+
+它所在的文件是 KafkaRequestHandler.scala，位于 core 包的 src/main/scala/kafka/server 下。这是一个不到 400 行的小文件，掌握起来并不难。
+
+这个文件的组件如下：
+
+* KafkaRequestHandler：请求处理线程类。每个请求处理线程实例，负责从 SocketServer 的 RequestChannel 的请求队列中获取请求对象，并进行处理。
+* KafkaRequestHandlerPool：请求处理线程池，负责创建、维护、管理和销毁下辖的请求处理线程。
+* BrokerTopicMetrics：Broker 端与主题相关的监控指标的管理类。
+* BrokerTopicStats：定义 Broker 端与主题相关的监控指标的管理操作。
+* BrokerTopicStats伴生对象：BrokerTopicStats 的伴生对象类，定义 Broker 端与主题相关的监控指标，比如常见的 MessagesInPerSec 和 MessagesOutPerSec 等。
+
+我们重点看前两个组件的代码。后面的三个类或对象都是与监控指标相关的，代码多为一些工具类方法或定义常量，非常容易理解。所以，我们不必在它们身上花费太多时间，要把主要精力放在 KafkaRequestHandler 及其相关管理类的学习上。
+
+### KafkaRequestHandler
+
+首先，我们来看下它的定义：
+
+```scala
+// 关键字段说明
+// id: I/O线程序号
+// brokerId：所在Broker序号，即broker.id值
+// totalHandlerThreads：I/O线程池大小
+// requestChannel：请求处理通道
+// apis：ApiRequestHandler接口，具体实现有KafkaApis和TestRaftRequestHandler，
+// 用于真正实现请求处理逻辑的类
+class KafkaRequestHandler(
+  id: Int,
+  brokerId: Int,
+  val aggregateIdleMeter: Meter,
+  val totalHandlerThreads: AtomicInteger,
+  val requestChannel: RequestChannel,
+  apis: ApiRequestHandler,
+  time: Time) extends Runnable with Logging {
+  ......
+}
+```
+
+从定义可知，KafkaRequestHandler 是一个 Runnable 对象，因此，你可以把它当成是一个线程。每个 KafkaRequestHandler 实例，都有 4 个关键的属性。
+
+* id：请求处理线程的序号，类似于 Processor 线程的 ID 序号，仅仅用于标识这是线程池中的第几个线程。
+* brokerId：Broker 序号，用于标识这是哪个 Broker 上的请求处理线程。
+* requestChannel：SocketServer 中的请求通道对象。KafkaRequestHandler 对象为什么要定义这个字段呢？我们说过，它是负责处理请求的类，那请求保存在什么地方呢？实际上，请求恰恰是保存在 RequestChannel 中的请求队列中，因此，Kafka 在构造 KafkaRequestHandler 实例时，必须关联 SocketServer 组件中的 RequestChannel 实例，也就是说，要让 I/O 线程能够找到请求被保存的地方。
+* apis：这是一个 KafkaApis 类。如果说 KafkaRequestHandler 是真正处理请求的，那么，KafkaApis 类就是真正执行请求处理逻辑的地方。它有个 handle 方法，用于执行请求处理逻辑。
+
+既然 KafkaRequestHandler 是一个线程类，那么，除去常规的 close、stop、initiateShutdown 和 awaitShutdown 方法，最重要的当属 run 方法实现了，如下所示：
+
+```scala
+def run(): Unit = {
+  // 只要该线程尚未关闭，循环运行处理逻辑
+  while (!stopped) {
+    val startSelectTime = time.nanoseconds
+    // 从请求队列中获取下一个待处理的请求
+    val req = requestChannel.receiveRequest(300)
+    val endTime = time.nanoseconds
+    // 统计线程空闲时间
+    val idleTime = endTime - startSelectTime
+    // 更新线程空闲百分比指标
+    aggregateIdleMeter.mark(idleTime / totalHandlerThreads.get)
+    req match {
+      // 关闭线程请求
+      case RequestChannel.ShutdownRequest =>
+        debug(s"Kafka request handler $id on broker $brokerId received shut down command")
+        // 关闭线程
+        shutdownComplete.countDown()
+        return
+      // 普通请求
+      case request: RequestChannel.Request =>
+        try {
+          request.requestDequeueTimeNanos = endTime
+          trace(s"Kafka request handler $id on broker $brokerId handling request $request")
+          // 由KafkaApis.handle方法执行相应处理逻辑
+          apis.handle(request)
+        } catch {
+          // 如果出现严重错误，立即关闭线程
+          case e: FatalExitError =>
+            shutdownComplete.countDown()
+            Exit.exit(e.statusCode)
+          // 如果是普通异常，记录错误日志
+          case e: Throwable => error("Exception when handling request", e)
+        } finally {
+          // 释放请求对象占用的内存缓冲区资源
+          request.releaseBuffer()
+        }
+      case null => // 继续
+    }
+  }
+  shutdownComplete.countDown()
+}
+```
+
+我来解释下 run 方法的主要运行逻辑。它的所有执行逻辑都在 while 循环之下，因此，只要标志线程关闭状态的 stopped 为 false，run 方法将一直循环执行 while 下的语句。
+
+那，第 1 步是从请求队列中获取下一个待处理的请求，同时更新一些相关的统计指标。如果本次循环没取到，那么本轮循环结束，进入到下一轮。如果是 ShutdownRequest 请求，则说明该 Broker 发起了关闭操作。
+
+而 Broker 关闭时会调用 KafkaRequestHandler 的 shutdown 方法，进而调用 initiateShutdown 方法，以及 RequestChannel 的 sendShutdownRequest 方法，而后者就是将 ShutdownRequest 写入到请求队列。
+
+一旦从请求队列中获取到 ShutdownRequest，run 方法代码会调用 shutdownComplete 的 countDown 方法，正式完成对 KafkaRequestHandler 线程的关闭操作。你看看 KafkaRequestHandlerPool 的 shutdown 方法代码，就能明白这是怎么回事了。
+
+```scala
+def shutdown(): Unit = synchronized {
+    info("shutting down")
+    for (handler <- runnables)
+      handler.initiateShutdown() // 调用initiateShutdown方法发起关闭
+    for (handler <- runnables)
+      // 调用awaitShutdown方法等待关闭完成
+      // run方法一旦调用countDown方法，这里将解除等待状态
+      handler.awaitShutdown() 
+    info("shut down completely")
+  }
+```
+
+就像代码注释中写的那样，一旦 run 方法执行了 countDown 方法，程序流解除在 awaitShutdown 方法这里的等待，从而完成整个线程的关闭操作。
+
+我们继续说回 run 方法。如果从请求队列中获取的是普通请求，那么，首先更新请求移出队列的时间戳，然后交由 KafkaApis 的 handle 方法执行实际的请求处理逻辑代码。待请求处理完成，并被释放缓冲区资源后，代码进入到下一轮循环，周而复始地执行以上所说的逻辑。
+
+### KafkaRequestHandlerPool
+
+从上面的分析来看，KafkaRequestHandler 逻辑大体上还是比较简单的。下面我们来看下 KafkaRequestHandlerPool 线程池的实现。它是管理 I/O 线程池的，实现逻辑也不复杂。它的 shutdown 方法前面我讲过了，这里我们重点学习下，它是如何创建这些线程的，以及创建它们的时机。
+
+```scala
+// 关键字段说明
+// brokerId：所属Broker的序号，即broker.id值
+// requestChannel：SocketServer组件下的RequestChannel对象
+// api：KafkaApis类，实际请求处理逻辑类
+// numThreads：I/O线程池初始大小
+class KafkaRequestHandlerPool(
+  val brokerId: Int, 
+  val requestChannel: RequestChannel,
+  val apis: KafkaApis,
+  time: Time,
+  numThreads: Int,
+  requestHandlerAvgIdleMetricName: String,
+  logAndThreadNamePrefix : String) 
+  extends Logging with KafkaMetricsGroup {
+  // I/O线程池大小
+  private val threadPoolSize: AtomicInteger = new AtomicInteger(numThreads)
+  // I/O线程池
+  val runnables = new mutable.ArrayBuffer[KafkaRequestHandler](numThreads)
+  ......
+}
+
+```
+
+KafkaRequestHandlerPool 对象定义了 7 个属性，其中比较关键的有 4 个，我分别来解释下。
+
+* brokerId：和 KafkaRequestHandler 中的一样，保存 Broker 的序号。
+* requestChannel：SocketServer 的请求处理通道，它下辖的请求队列为所有 I/O 线程所共享。requestChannel 字段也是 KafkaRequestHandler 类的一个重要属性。
+* apis：KafkaApis 实例，执行实际的请求处理逻辑。它同时也是 KafkaRequestHandler 类的一个重要属性。
+* numThreads：线程池中的初始线程数量。它是 Broker 端参数 num.io.threads 的值。目前，Kafka 支持动态修改 I/O 线程池的大小，因此，这里的 numThreads 是初始线程数，调整后的 I/O 线程池的实际大小可以和 numThreads 不一致。
+
+这里我再详细解释一下 numThreads 属性和实际线程池中线程数的关系。就像我刚刚说过的，I/O 线程池的大小是可以修改的。如果你查看 KafkaServer.scala 中的 startup 方法，你会看到以下这两行代码：
+
+```scala
+// KafkaServer.scala
+dataPlaneRequestHandlerPool = new KafkaRequestHandlerPool(config.brokerId, socketServer.dataPlaneRequestChannel, dataPlaneRequestProcessor, time, config.numIoThreads, s"${SocketServer.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent", SocketServer.DataPlaneThreadPrefix)
+
+controlPlaneRequestHandlerPool = new KafkaRequestHandlerPool(config.brokerId, socketServer.controlPlaneRequestChannelOpt.get, controlPlaneRequestProcessor, time, 1, s"${SocketServer.ControlPlaneMetricPrefix}RequestHandlerAvgIdlePercent", SocketServer.ControlPlaneThreadPrefix)
+
+```
+
+由代码可知，Data plane 所属的 KafkaRequestHandlerPool 线程池的初始数量，就是 Broker 端的参数 nums.io.threads，即这里的 config.numIoThreads 值；而用于 Control plane 的线程池的数量，则硬编码为 1。
+
+因此，你可以发现，Broker 端参数 num.io.threads 的值控制的是 Broker 启动时 KafkaRequestHandler 线程的数量。因此，当你想要在一开始就提升 Broker 端请求处理能力的时候，不妨试着增加这个参数值。
+
+除了上面那 4 个属性，该类还定义了一个 threadPoolSize 变量。本质上，它就是用 AtomicInteger 包了一层 numThreads 罢了。
+
+为什么要这么做呢？这是因为，目前 Kafka 支持动态调整 KafkaRequestHandlerPool 线程池的线程数量，但类定义中的 numThreads 一旦传入，就不可变更了，因此，需要单独创建一个支持更新操作的线程池数量的变量。至于为什么使用 AtomicInteger，你应该可以想到，这是为了保证多线程访问的线程安全性。毕竟，这个线程池大小的属性可能被多个线程访问到，而 AtomicInteger 本身提供的原子操作，能够有效地确保这种并发访问，同时还能提供必要的内存可见性。
+
+既然是管理 I/O 线程池的类，KafkaRequestHandlerPool 中最重要的字段当属线程池字段 runnables 了。就代码而言，Kafka 选择使用 Scala 的数组对象类实现 I/O 线程池。
+
+当线程池初始化时，Kafka 使用下面这段代码批量创建线程，并将它们添加到线程池中：
+
+```scala
+for (i <- 0 until numThreads) {
+  createHandler(i) // 创建numThreads个I/O线程
+}
+// 创建序号为指定id的I/O线程对象，并启动该线程
+def createHandler(id: Int): Unit = synchronized {
+  // 创建KafkaRequestHandler实例并加入到runnables中
+  runnables += new KafkaRequestHandler(id, brokerId, aggregateIdleMeter, threadPoolSize, requestChannel, apis, time)
+  // 启动KafkaRequestHandler线程
+  KafkaThread.daemon(logAndThreadNamePrefix + "-kafka-request-handler-" + id, runnables(id)).start()
+}
+```
+
+我来解释下这段代码。源码使用 for 循环批量调用 createHandler 方法，创建多个 I/O 线程。createHandler 方法的主体逻辑分为三步：
+
+* 创建 KafkaRequestHandler 实例；
+* 将创建的线程实例加入到线程池数组；
+* 启动该线程。
+
+下面我们说说 resizeThreadPool 方法的代码。这个方法的目的是，把 I/O 线程池的线程数重设为指定的数值。代码如下：
+
+```scala
+def resizeThreadPool(newSize: Int): Unit = synchronized {
+  val currentSize = threadPoolSize.get
+  info(s"Resizing request handler thread pool size from $currentSize to $newSize")
+  if (newSize > currentSize) {
+    for (i <- currentSize until newSize) {
+      createHandler(i)
+    }
+  } else if (newSize < currentSize) {
+    for (i <- 1 to (currentSize - newSize)) {
+      runnables.remove(currentSize - i).stop()
+    }
+  }
+  threadPoolSize.set(newSize)
+}
+
+```
+
+该方法首先获取当前线程数量。如果目标数量比当前数量大，就利用刚才说到的 createHandler 方法将线程数补齐到目标值 newSize；否则的话，就将多余的线程从线程池中移除，并停止它们。最后，把标识线程数量的变量 threadPoolSize 的值调整为目标值 newSize。
+
+至此，KafkaRequestHandlerPool 类的 3 个方法 shutdown、createHandler 和 resizeThreadPool 我们就学完了。总体而言，它就是负责管理 I/O 线程池的类。
+
+## 全处理流程
+
+见整体架构图
+
+图中一共有 6 步。我分别解释一下，同时还会带你去找寻对应的源码。
+
+### 1 Clients 或其他 Broker 发送请求给 Acceptor 线程
+
+Acceptor 线程实时接收来自外部的发送请求。一旦接收到了之后，就会创建对应的 Socket 通道，代码见Acceptor的run方法。
+
+可以看到，Acceptor 线程通过调用 accept 方法，创建对应的 SocketChannel，然后将该 Channel 实例传给 assignNewConnection 方法，等待 Processor 线程将该 Socket 连接请求，放入到它维护的待处理连接队列中。后续 Processor 线程的 run 方法会不断地从该队列中取出这些 Socket 连接请求，然后创建对应的 Socket 连接。
+
+assignNewConnection 方法的主要作用是，将这个新建的 SocketChannel 对象存入 Processors 线程的 newConnections 队列中。之后，Processor 线程会不断轮询这个队列中的待处理 Channel（可以参考第Processor的 configureNewConnections 方法），并向这些 Channel 注册基于 Java NIO 的 Selector，用于真正的请求获取和响应发送 I/O 操作。
+
+严格来说，Acceptor 线程处理的这一步并非真正意义上的获取请求，仅仅是 Acceptor 线程为后续 Processor 线程获取请求铺路而已，也就是把需要用到的 Socket 通道创建出来，传给下面的 Processor 线程使用。
+
+### 2&3 Processor 线程处理请求，并放入请求队列
+
+一旦 Processor 线程成功地向 SocketChannel 注册了 Selector，Clients 端或其他 Broker 端发送的请求就能通过该 SocketChannel 被获取到，具体的方法是 Processor 的 processCompleteReceives，代码在之前已经列出。
+
+该方法会将 Selector 获取到的所有 Receive 对象转换成对应的 Request 对象，然后将这些 Request 实例放置到请求队列中。
+
+所谓的 Processor 线程处理请求，就是指它从底层 I/O 获取到发送数据，将其转换成 Request 对象实例，并最终添加到请求队列的过程。
+
+### 4 I/O 线程处理请求
+
+所谓的 I/O 线程，就是我们开头提到的 KafkaRequestHandler 线程，它的处理逻辑就在 KafkaRequestHandler 类的 run 方法中，KafkaRequestHandler 线程循环地从请求队列中获取 Request 实例，然后交由 KafkaApis 的 handle 方法，执行真正的请求处理逻辑。
+
+### 5 KafkaRequestHandler 线程将 Response 放入 Processor 线程的 Response 队列
+
+这一步的工作由 KafkaApis 类完成。当然，这依然是由 KafkaRequestHandler 线程来完成的。KafkaApis.scala 中有个 sendResponse 方法，将 Request 的处理结果 Response 发送出去。本质上，它就是调用了 RequestChannel 的 sendResponse 方法，代码如下：
+
+```scala
+def sendResponse(response: RequestChannel.Response): Unit = {
+  ......
+  // 找到这个Request当初是由哪个Processor线程处理的
+  val processor = processors.get(response.processor)
+  if (processor != null) {
+    // 将Response添加到该Processor线程的Response队列上
+    processor.enqueueResponse(response)
+  }
+}
+```
+
+### Processor 线程发送 Response 给 Request 发送方
+
+最后一步是，Processor 线程取出 Response 队列中的 Response，返还给 Request 发送方。具体代码位于 Processor 线程的 processNewResponses 方法中。
+
+从这段代码可知，最核心的部分是 sendResponse 方法来执行 Response 发送。该方法底层使用 Selector 实现真正的发送逻辑。至此，一个请求被完整处理的流程我就讲完了。
+
+最后，我想再补充一点，还记得我之前说过，有些 Response 是需要有回调逻辑的吗？
+
+实际上，在第 6 步执行完毕之后，Processor 线程通常还会尝试执行 Response 中的回调逻辑，即 Processor 类的 processCompletedSends 方法。不过，并非所有 Request 或 Response 都指定了回调逻辑。事实上，只有很少的 Response 携带了回调逻辑。比如说，FETCH 请求在发送 Response 之后，就要求更新下 Broker 端与消息格式转换操作相关的统计指标。
+
+## KafkaApis
+
+KafkaApis 是 Kafka 最重要的源码入口。因为，每次要查找 Kafka 某个功能的实现代码时，我们几乎总要从这个 KafkaApis.scala 文件开始找起，然后一层一层向下钻取，直到定位到实现功能的代码处为止。比如，如果你想知道创建 Topic 的流程，你只需要查看 KafkaApis 的 handleCreateTopicsRequest 方法；如果你想弄懂 Consumer 提交位移是怎么实现的，查询 handleOffsetCommitRequest 方法就行了。
+
+除此之外，在这一遍遍的钻取过程中，我们还会慢慢地掌握 Kafka 实现各种功能的代码路径和源码分布，从而建立起对整个 Kafka 源码工程的完整认识。
+
+### KafkaApis类定义
+
+好了， 我们首先来看下 KafkaApis 类的定义。KafkaApis 类定义在源码文件 KafkaApis.scala 中。该文件位于 core 工程的 server 包下，是一个将近 3000 行的巨型文件。好在它实现的逻辑并不复杂，绝大部分代码都是用来处理所有 Kafka 请求类型的，因此，代码结构整体上显得非常规整。一会儿我们在学习 handle 方法时，你一定会深有体会。
+
+KafkaApis 类的定义代码如下：
+
+```scala
+class KafkaApis(
+  val requestChannel: RequestChannel, // 请求通道
+  val replicaManager: ReplicaManager, // 副本管理器
+  val adminManager: AdminManager,   // 主题、分区、配置等方面的管理器
+    val groupCoordinator: GroupCoordinator,  // 消费者组协调器组件
+  val txnCoordinator: TransactionCoordinator,  // 事务管理器组件
+  val controller: KafkaController,  // 控制器组件
+  val zkClient: KafkaZkClient,    // ZooKeeper客户端程序，Kafka依赖于该类实现与ZooKeeper交互
+  val brokerId: Int,          // broker.id参数值
+    val config: KafkaConfig,      // Kafka配置类
+    val metadataCache: MetadataCache,  // 元数据缓存类
+    val metrics: Metrics,      
+  val authorizer: Option[Authorizer],
+  val quotas: QuotaManagers,          // 配额管理器组件
+  val fetchManager: FetchManager,
+  brokerTopicStats: BrokerTopicStats,
+  val clusterId: String,
+  time: Time,
+  val tokenManager: DelegationTokenManager,
+  val brokerFeatures: BrokerFeatures,
+  val finalizedFeatureCache: FinalizedFeatureCache) extends ApiRequestHandler withLogging {
+  type FetchResponseStats = Map[TopicPartition, RecordConversionStats]
+  this.logIdent = "[KafkaApi-%d] ".format(brokerId)
+  val adminZkClient = new AdminZkClient(zkClient)
+  private val alterAclsPurgatory = new DelayedFuturePurgatory(purgatoryName = "AlterAcls", brokerId = config.brokerId)
+  ......
+}
+```
+
+放眼整个源码工程，KafkaApis 关联的“大佬级”组件都是最多的！在 KafkaApis 中，你几乎能找到 Kafka 所有重量级的组件，比如，负责副本管理的 ReplicaManager、维护消费者组的 GroupCoordinator 以及操作 Controller 组件的 KafkaController，等等。在处理不同类型的 RPC 请求时，KafkaApis 会用到不同的组件，因此，在创建 KafkaApis 实例时，我们必须把可能用到的组件一并传给它，这也是它汇聚众多大牌组件于一身的原因。
+
+### KafkaApis 方法入口
+
+如果你翻开 KafkaApis 类的代码，你会发现，它封装了很多以 handle 开头的方法。每一个这样的方法都对应于一类请求类型，而它们的总方法入口就是 handle 方法。实际上，你完全可以在 handle 方法间不断跳转，去到任意一类请求被处理的实际代码中。
+
+从这个 handle 方法中，我们也能得到这样的结论：每当社区添加新的 RPC 协议时，Broker 端大致需要做三件事情。
+
+* 更新 ApiKeys 枚举，加入新的 RPC ApiKey；
+* 在 KafkaApis 中添加对应的 handle×××Request 方法，实现对该 RPC 请求的处理逻辑；
+* 更新 KafkaApis 的 handle 方法，添加针对 RPC 协议的 case 分支。
+
+### 其他重要方法
+
+抛开 KafkaApis 的定义和 handle 方法，还有几个常用的方法也很重要，比如，用于发送 Response 的一组方法，以及用于鉴权的方法。特别是前者，它是任何一类请求被处理之后都要做的必要步骤。毕竟，请求被处理完成还不够，Kafka 还需要把处理结果发送给请求发送方。
+
+首先就是 sendResponse 系列方法。
+
+为什么说是系列方法呢？因为源码中带有 sendResponse 字眼的方法有 7 个之多。我分别来介绍一下。
+
+* sendResponse（RequestChannel.Response）：最底层的 Response 发送方法。本质上，它调用了 SocketServer 组件中 RequestChannel 的 sendResponse 方法，我在前面的课程中讲到过，RequestChannel 的 sendResponse 方法会把待发送的 Response 对象添加到对应 Processor 线程的 Response 队列上，然后交由 Processor 线程完成网络间的数据传输。
+* sendResponse（RequestChannel.Request，responseOpt: Option[AbstractResponse]，onComplete: Option[Send => Unit]）：该方法接收的实际上是 Request，而非 Response，因此，它会在内部构造出 Response 对象之后，再调用 sendResponse 方法。
+* sendNoOpResponseExemptThrottle：发送 NoOpResponse 类型的 Response 而不受请求通道上限流（throttling）的限制。所谓的 NoOpResponse，是指 Processor 线程取出该类型的 Response 后，不执行真正的 I/O 发送操作。
+* sendErrorResponseExemptThrottle：发送携带错误信息的 Response 而不受限流限制。
+* sendResponseExemptThrottle：发送普通 Response 而不受限流限制。
+* sendErrorResponseMaybeThrottle：发送携带错误信息的 Response 但接受限流的约束。
+* sendResponseMaybeThrottle：发送普通 Response 但接受限流的约束。
+
+这组方法最关键的还是第一个 sendResponse 方法。大部分类型的请求被处理完成后都会使用这个方法将 Response 发送出去。至于上面这组方法中的其他方法，它们会在内部调用第一个 sendResponse 方法。当然，在调用之前，这些方法通常都拥有一些定制化的逻辑。比如 sendResponseMaybeThrottle 方法就会在执行 sendResponse 逻辑前，先尝试对请求所属的请求通道进行限流操作。因此，我们要着重掌握第一个 sendResponse 方法是怎么将 Response 对象发送出去的。
+
+就像我前面说的，KafkaApis 实际上是把处理完成的 Response 放回到前端 Processor 线程的 Response 队列中，而真正将 Response 返还给 Clients 或其他 Broker 的，其实是 Processor 线程，而不是执行 KafkaApis 逻辑的 KafkaRequestHandler 线程。
+
+另一个非常重要的方法是 authorize 方法，咱们看看它的代码：
+
+```scala
+private[server] def authorize(requestContext: RequestContext,
+  operation: AclOperation,
+  resourceType: ResourceType,
+  resourceName: String,
+  logIfAllowed: Boolean = true,
+  logIfDenied: Boolean = true,
+  refCount: Int = 1): Boolean = {
+  authorizer.forall { authZ =>
+    // 获取待鉴权的资源类型
+    // 常见的资源类型如TOPIC、GROUP、CLUSTER等
+    val resource = new ResourcePattern(resourceType, resourceName, PatternType.LITERAL)
+    val actions = Collections.singletonList(new Action(operation, resource, refCount, logIfAllowed, logIfDenied))
+    // 返回鉴权结果，是ALLOWED还是DENIED
+    authZ.authorize(requestContext, actions).asScala.head == AuthorizationResult.ALLOWED
+  }
+}
+```
+
+这个方法是做授权检验的。目前，Kafka 所有的 RPC 请求都要求发送者（无论是 Clients，还是其他 Broker）必须具备特定的权限。
+
+接下来，我用创建主题的代码来举个例子，说明一下 authorize 方法的实际应用，以下是 handleCreateTopicsRequest 方法的片段：
+
+```scala
+// 是否具有CLUSTER资源的CREATE权限
+val hasClusterAuthorization = authorize(request, CREATE, CLUSTER, CLUSTER_NAME, logIfDenied = false)
+val topics = createTopicsRequest.data.topics.asScala.map(_.name)
+// 如果具有CLUSTER CREATE权限，则允许主题创建，否则，还要查看是否具有TOPIC资源的CREATE权限
+val authorizedTopics = if (hasClusterAuthorization) topics.toSet else filterAuthorized(request, CREATE, TOPIC, topics.toSeq)
+// 是否具有TOPIC资源的DESCRIBE_CONFIGS权限
+val authorizedForDescribeConfigs = filterAuthorized(request, DESCRIBE_CONFIGS, TOPIC, topics.toSeq, logIfDenied = false)
+  .map(name => name -> results.find(name)).toMap
+
+results.asScala.foreach(topic => {
+  if (results.findAll(topic.name).size > 1) {
+    topic.setErrorCode(Errors.INVALID_REQUEST.code)
+    topic.setErrorMessage("Found multiple entries for this topic.")
+  } else if (!authorizedTopics.contains(topic.name)) { // 如果不具备CLUSTER资源的CREATE权限或TOPIC资源的CREATE权限，认证失败！
+    topic.setErrorCode(Errors.TOPIC_AUTHORIZATION_FAILED.code)
+    topic.setErrorMessage("Authorization failed.")
+  }
+  if (!authorizedForDescribeConfigs.contains(topic.name)) { // 如果不具备TOPIC资源的DESCRIBE_CONFIGS权限，设置主题配置错误码
+    topic.setTopicConfigErrorCode(Errors.TOPIC_AUTHORIZATION_FAILED.code)
+  }
+})
+......
+```
+
+这段代码调用 authorize 方法，来判断 Clients 方法是否具有创建主题的权限，如果没有，则显式标记 TOPIC_AUTHORIZATION_FAILED，告知 Clients 端。目前，Kafka 所有的权限控制均发生在 KafkaApis 中，即所有请求在处理前，都需要调用 authorize 方法做权限校验，以保证请求能够被继续执行。

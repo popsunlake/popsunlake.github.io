@@ -1,3 +1,13 @@
+---
+title: kafka服务端-消费组
+date: 2022-12-22 12:39:04
+tags: [kafka, 服务端, 消费组]
+categories:
+  - [kafka, 服务端]
+---
+
+
+
 Kafka 消费者组在 Broker 端的源码实现，包括消费者组元数据的定义与管理、组元数据管理器、内部主题 __consumer_offsets 和重要的组件GroupCoordinator。  先简单介绍一下这4部分的功能：
 
 消费者组元数据：这部分源码主要包括 GroupMetadata 和 MemberMetadata。这两个类共同定义了消费者组的元数据都由哪些内容构成。  
@@ -7,6 +17,8 @@ Kafka 消费者组在 Broker 端的源码实现，包括消费者组元数据的
 __consumer_offsets：Kafka 的内部主题。除了我们熟知的消费者组提交位移记录功能之外，它还负责保存消费者组的注册记录消息。
 
 GroupCoordinator：组协调者组件，提供通用的组成员管理和位移管理。  
+
+<!-- more -->
 
 # 消费者组元数据
 

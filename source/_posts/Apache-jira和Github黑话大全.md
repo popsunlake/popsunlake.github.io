@@ -1,6 +1,6 @@
 ---
 title: Apache-jira/Github黑话大全
-date: 2014-12-22 12:39:04
+date: 2021-12-22 12:39:04
 tags: [简写, jira, github]
 categories:
   - [github]

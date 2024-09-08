@@ -1,4 +1,16 @@
+---
+title: kafka客户端-消费者
+date: 2022-12-22 12:39:04
+tags: [kafka, 服务端, 消费者]
+categories:
+  - [kafka, 服务端]
+---
+
+
+
 ## 消费者位移提交
+
+<!-- more -->
 
 Kafka服务端并不会记录消费者的消费位置， 而是由消费者自己决定如何保存如何记录其消费的offset。 旧版本的消费者会将其消费位置记录到ZooKeeper中， 在新版本消费者中为了缓解ZooKeeper集群的压力， 在Kafka服务端中添加了一个名为\__consumer_offsets的内部Topic。消费者通过读取__consumer_offsets中记录的offset获取之前的消费位移， 并从此offset位置继续消费  
 

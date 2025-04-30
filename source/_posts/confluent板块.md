@@ -1,3 +1,11 @@
+---
+title: confluent网站
+date: 2025-04-30 11:39:04
+tags: [kafka, confluent]
+categories:
+  - [kafka, 学习资源]
+---
+
 ## WHY CONFLUENT
 
 
@@ -19,6 +27,8 @@
 ### Blog
 
 [Apache Kafka, Flink, and Data Streaming Articles | Confluent](https://www.confluent.io/blog/area/technology/)
+
+<!-- more -->
 
 分为Technology、Customers&Business和Company三类，主要关注Technology，里面都是kafka技术相关的blog。
 

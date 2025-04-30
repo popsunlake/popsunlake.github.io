@@ -1,3 +1,11 @@
+---
+title: kafka-stream
+date: 2025-04-30 11:39:04
+tags: [kafka, stream]
+categories:
+  - [kafka, 服务端]
+---
+
 参考：[Apache Kafka](https://kafka.apache.org/documentation/streams/)
 
 ### 运行kafka-stream例子
@@ -11,6 +19,8 @@ bin/kafka-topics.sh --create \
     --partitions 1 \
     --topic streams-plaintext-input
 ```
+
+<!-- more -->
 
 **streams-wordcount-output**的清理策略为compact
 

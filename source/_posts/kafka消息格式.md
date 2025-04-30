@@ -8,7 +8,7 @@ categories:
 
 kafka0.11.0版本之后的消息结构如下所示：
 
-![消息格式](D:\kafka相关\kafka源码整理\2025-04-29\消息格式.png)
+![消息格式](/images/消息格式.png)
 
 RecordBatch内部包含了一条或多条消息。这一条或多条消息共用一个Header。
 <!-- more -->

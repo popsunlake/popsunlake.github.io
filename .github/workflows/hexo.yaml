@@ -26,40 +26,47 @@ defaults:
     shell: bash
 
 jobs:
-  # Build job
+  # 1) 生成静态站点并上传为工件
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout source
+        uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v3
-      - name: Use Node.js 18.x
-        uses: actions/setup-node@v3
-        with:
-          node-version: "18"
-      - name: Install Dependencies
-        run: npm install
-      - name: Fix Image Paths
-        run: node fix-image-paths.js
-      - name: Build with Hexo
-        run: npx hexo g
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
-        with:
-          path: ./public
 
-  # Deployment job
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20          # 如需 Node-18 改成 18
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fix image paths (可选)
+        run: node fix-image-paths.js
+
+      - name: Build with Hexo
+        run: npx hexo generate      # 等价 npx hexo g
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public            # Hexo 输出目录
+
+  # 2) 部署到 GitHub Pages
   deploy:
+    needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
+
     steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v4
+
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4

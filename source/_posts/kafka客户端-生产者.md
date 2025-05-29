@@ -5,14 +5,12 @@ tags: [kafka, 生产者, 源码剖析]
 categories:
   - [kafka, 客户端, 生产者]
 ---
-
-
+# 底层原理
 
 produce客户端完整架构图如下所示：
-
 <!-- more -->
 
-![produce客户端完整流程](E:\github博客\技术博客\source\images\produce客户端\produce客户端完整流程.jpg)
+![produce客户端完整流程](D:\kafka相关\kafka源码整理\produce客户端\图片\produce客户端完整流程.jpg)
 
 1. ProduceInterceptors对消息进行拦截
 2. Serializer对消息的key和value进行序列化
@@ -23,12 +21,72 @@ produce客户端完整架构图如下所示：
 7. 将ClientRequest交给NetworkClient，准备发送
 8. NetworkClient将请求放入KafkaChannel的缓存
 9. 执行网络IO，发送请求
-10. 收到响应，调用ClentRequest的回调函数
-11. 调用RecordBatch的回调函数，最终调用每个消息上注册的回调函数
+10. 收到响应，调用ClientRequest的回调函数（代码逻辑见NetworkClient一节）
+11. 调用RecordBatch的回调函数，最终调用每个消息上注册的回调函数（代码逻辑见NetworkClient一节）
 
 消息发送的过程，涉及两个线程协同工作。主线程首先将业务数据封装成ProducerRecord对象，之后调用send()方法将消息放入RecordAccumulator中暂存。Sender线程负责将消息信息构成请求，并最终执行网络IO的线程，他从RecordAccumulator中取出消息批量发送出去。需要注意的是，KafkaProducer是线程安全的，多个线程间可以共享使用同一个KafkaProducer对象。
 
+## ProducerPerformance
+
+kafka做生产性能压测的时候会使用kafka-producer-perf-test.sh脚本，该脚本的入口类就是ProducerPerformance。因此我们将分析的起点放在该类。
+
+numRecords指定了调用该脚本生产的消息条数：
+
+```java
+for (int i = 0; i < numRecords; i++) {
+				...
+                record = new ProducerRecord<>(topicName, payload);
+				...
+                Callback cb = stats.nextCompletion(sendStartMs, payload.length, stats);
+                producer.send(record, cb);
+				...
+            }
+```
+
+主体逻辑很清晰，根据业务数据构造record对象，然后调用KafkaProducer中的send()方法。
+
+## KafkaProducer
+
+在KafkaProducer中会依次进行3个步骤：
+
+* ProduceInterceptors对消息进行拦截
+* Serializer对消息的key和value进行序列化
+* Partitioner为消息选择合适的Partition
+
+然后将消息放到RecordAccumulator中：
+
+```java
+// 1. tp中保存了topic和partition的信息
+// 2. serializedKey,serializedValue是序列化后的key和value
+// 3. interceptCallback是拦截器，之前已经用了拦截器中的onSend()方法，在消息发送响应收到时还会调用 
+//    拦截器中的onAcknowledged()方法
+RecordAccumulator.RecordAppendResult result = accumulator.append(tp, timestamp, 		       serializedKey,serializedValue, headers, interceptCallback, remainingWaitMs);
+```
+
 ## RecordAccumulator
+
+在KafkaProducer的构造方法中会构造accumulator实例：
+
+```java
+// 参数1：上下文信息
+// 参数2：batch.size，默认16KB。将发往相同partition的多个record压缩到一个batch中
+// 参数3：buffer.memory，默认32MB。用于缓存record的内存大小
+// 参数4：压缩方式
+// 参数5：linger.ms，默认0。默认情况下，只要有record就发，不管record是否已经凑成16KB了。在设置为5ms
+//       情况下，在还没攒到16KB时，会等5ms，如果已经16KB，也不等待，会立即发。（类似TCP中的Nagle算法）
+// 参数6：retry.backoff.ms，默认100ms。两次重试之间的间隔
+// ...
+this.accumulator = new RecordAccumulator(logContext,
+                    config.getInt(ProducerConfig.BATCH_SIZE_CONFIG),
+                    this.totalMemorySize,
+                    this.compressionType,
+                    config.getLong(ProducerConfig.LINGER_MS_CONFIG),
+                    retryBackoffMs,
+                    metrics,
+                    time,
+                    apiVersions,
+                    transactionManager);
+```
 
 记录收集器中有一个最重要的字段batches：
 
@@ -36,17 +94,69 @@ produce客户端完整架构图如下所示：
 private final ConcurrentMap<TopicPartition, Deque<ProducerBatch>> batches;
 ```
 
-保存了分区和待发送到该分区上的消息。待发送到该分区上的消息保存在双端队列ArrayDeque中，每个双端队列由数个ProducerBatch组成（RecordBatch是在ProducerBatch里面的一个专门存放消息的对象，除此之外ProducerBatch还有其它相关属性。在架构图中经常用RecordBatch代替ProducerBatch），每个ProducerBatch的大小由配置项batch.size控制，默认为16KB。
+key为分区，value为一个双端队列，双端队列中每个元素为ProducerBatch，大小为batch.size。保存了发送到该分区的一批消息。
 
-![Accumulator图片1](E:\github博客\技术博客\source\images\produce客户端\Accumulator图片1.png)
+![Accumulator图片1](D:\kafka相关\kafka源码整理\produce客户端\图片\Accumulator图片1.png)
 
-追加消息时首先获取分区所属的双端队列，然后取队列中最后一个RecordBatch，如果队列中不存在RecordBatch或者已经不能写入已存在的RecordBatch（比如默认16KB，消息大小为10KB，当写入第二条信息时，发现20KB大于16KB，会不能写入），则创建一个新的RecordBatch。
+append()方法追加消息时首先获取分区所属的双端队列，然后取队列中最后一个ProducerBatch，如果队列中不存在ProducerBatch或者已经不能写入已存在的ProducerBatch（比如默认16KB，消息大小为10KB，当写入第二条信息时，发现20KB大于16KB，会不能写入），则创建一个新的ProducerBatch。
 
 具体流程如下所示：
 
-![Accumulator图片2](E:\github博客\技术博客\source\_posts\Accumulator图片2.png)
+![Accumulator图片2](D:\kafka相关\kafka源码整理\produce客户端\图片\Accumulator图片2.png)
+
+expiredBatches()方法用于判断accumulator中是否有过期的消息并将过期的消息剔除。
+
+```java
+// 参数1：request.timeout.ms，默认30s。Sender构造方法中传入，Sender调用该方法时传递
+public List<ProducerBatch> expiredBatches(int requestTimeout, long now) {
+
+    }
+
+```
+
+
 
 ## Sender
+
+在KafkaProducer的构造方法中会构造并启动Sender线程。（注意sender中包含NetworkClient，NetworkClient中包含Selector）
+
+```java
+KafkaClient client = kafkaClient != null ? kafkaClient : new NetworkClient(
+                    new Selector(config.getLong(ProducerConfig.CONNECTIONS_MAX_IDLE_MS_CONFIG),
+                            this.metrics, time, "producer", channelBuilder, logContext),
+                    this.metadata,
+                    clientId,
+                    maxInflightRequests,
+                    config.getLong(ProducerConfig.RECONNECT_BACKOFF_MS_CONFIG),
+                    config.getLong(ProducerConfig.RECONNECT_BACKOFF_MAX_MS_CONFIG),
+                    config.getInt(ProducerConfig.SEND_BUFFER_CONFIG),
+                    config.getInt(ProducerConfig.RECEIVE_BUFFER_CONFIG),
+                    this.requestTimeoutMs,
+                    time,
+                    true,
+                    apiVersions,
+                    throttleTimeSensor,
+                    logContext);
+this.sender = new Sender(logContext,
+                         client,
+                         this.metadata,
+                         this.accumulator,
+                         maxInflightRequests == 1,
+                         config.getInt(ProducerConfig.MAX_REQUEST_SIZE_CONFIG),
+                         acks,
+                         retries,
+                         metricsRegistry.senderMetrics,
+                         Time.SYSTEM,
+                         this.requestTimeoutMs,
+                         config.getLong(ProducerConfig.RETRY_BACKOFF_MS_CONFIG),
+                         this.transactionManager,
+                         apiVersions);
+String ioThreadName = NETWORK_THREAD_PREFIX + " | " + clientId;
+this.ioThread = new KafkaThread(ioThreadName, this.sender, true);
+this.ioThread.start();
+```
+
+
 
 ### 从记录收集器获取数据
 
@@ -57,7 +167,7 @@ private final ConcurrentMap<TopicPartition, Deque<ProducerBatch>> batches;
 
 假设有两台服务器，topic有6个分区，单副本，那么每台服务器就有3个分区。如下图所示，如果按照方式1，总共会有6个请求，如果按照方式2，总共会有2个请求。kafka中使用方式2，可以大大减少网络的开销。
 
-![sender图片1](E:\github博客\技术博客\source\images\produce客户端\sender图片1.png)
+![sender图片1](D:\kafka相关\kafka源码整理\produce客户端\图片\sender图片1.png)
 
 Sender的run()方法中主要逻辑主要分为两部分：sendProducerData()和client.poll()。在sendProducerData()中实现，最重要的是这3个方法：
 
@@ -81,8 +191,8 @@ drain()方法详解：
 // 获取当前node上的生产者对应topic的所有leader分区
 List<PartitionInfo> parts = cluster.partitionsForNode(node.id());
 // 遍历leader分区，从accumulator的batches中拿到对应分区的数据，追加到node对应的列表中。accumulator中
-// 的ProducerBatch不需要任何变化就可以添加到node对应的List中。需要注意的是该方法中只会从分区Deque中拿第
-// 1个ProducerBatch，即使分区Deque中已经堆积了多个ProducerBatch
+// 的ProducerBatch不需要任何变化就可以添加到node对应的List中。需要注意的是该方法中会从每个分区Deque中拿
+// 第1个ProducerBatch，即使分区Deque中已经堆积了多个ProducerBatch
 ```
 
 
@@ -95,7 +205,7 @@ List<PartitionInfo> parts = cluster.partitionsForNode(node.id());
 4. 发送线程通过drain()从记录收集器获取按照节点整理好的List<ProducerBatch>
 5. 发送线程得到每个节点的批记录后，为每个节点创建客户端请求ClientRequest，并将请求发送到服务端
 
-![sender图片2](E:\github博客\技术博客\source\images\produce客户端\sender图片2.png)
+![sender图片2](D:\kafka相关\kafka源码整理\produce客户端\图片\sender图片2.png)
 
 
 
@@ -153,7 +263,7 @@ NetworkClient管理了客户端和服务端之间的网络通信，包括连接�
 
 inFlightRequests变量在客户端缓存了还没有收到响应的客户端请求。InFlightRequests.requests变量的结构为Map<String, Deque<NetworkClient.InFlightRequest>>，key为各个broker，value为发往各个broker的还没有收到响应的请求，用ArrayDeque保存，ArrayDeque的最大长度可通过配置项配置，默认为5。 当收到响应时，该请求会从inFlightRequests中移除。
 
-![NetworkClient图片1](E:\github博客\技术博客\source\images\produce客户端\NetworkClient图片1.png)
+![NetworkClient图片1](D:\kafka相关\kafka源码整理\produce客户端\图片\NetworkClient图片1.png)
 
 在ready()方法和send()方法中均会调用InFlightRequests.canSendMore()来确定当前是否能调用selector.send()方法。能调用的条件是：该broker对应的发送请求队列为空；或者该broker对应的发送请求队列所有的请求都已经发送了且当前请求个数少于5个。
 
@@ -196,7 +306,7 @@ client.poll()中最关键的步骤是调用selector.poll()方法，这个方法�
 
 ```
 
-handleCompletedSends()的代码如下所示，如果请求不需要响应，那么请求发送成功后，该请求就会从inFlightRequests中移除。（我们的环境中，都是需要响应的，因此这个方法内部的逻辑不会执行）。responses中被塞入了空的响应体和请求的回调函数
+handleCompletedSends()的代码如下所示，如果请求不需要响应（acks=0的时候），那么请求发送成功后，该请求就会从inFlightRequests中移除。（我们的环境中，acks要么是1要么是-1,）。responses中被塞入了空的响应体和请求的回调函数
 
 ```java
     private void handleCompletedSends(List<ClientResponse> responses, long now) {
@@ -251,6 +361,61 @@ completeResponses()的代码如下所示，可以看到是对所有的responses�
     }
 ```
 
+clientRequest的回调逻辑定义在Sender#handleProduceResponse()中。根据response中的响应分为以下3种，并最终调用completeBatch()方法。
+
+* 网络异常
+* 版本不匹配
+* 正常响应
+
+```java
+    private void handleProduceResponse(ClientResponse response, Map<TopicPartition, ProducerBatch> batches, long now) {
+        RequestHeader requestHeader = response.requestHeader();
+        long receivedTimeMs = response.receivedTimeMs();
+        int correlationId = requestHeader.correlationId();
+        if (response.wasDisconnected()) {
+            log.trace("Cancelled request with header {} due to node {} being disconnected",
+                    requestHeader, response.destination());
+            for (ProducerBatch batch : batches.values())
+                completeBatch(batch, new ProduceResponse.PartitionResponse(Errors.NETWORK_EXCEPTION), correlationId, now, 0L);
+        } else if (response.versionMismatch() != null) {
+            log.warn("Cancelled request {} due to a version mismatch with node {}",
+                    response, response.destination(), response.versionMismatch());
+            for (ProducerBatch batch : batches.values())
+                completeBatch(batch, new ProduceResponse.PartitionResponse(Errors.UNSUPPORTED_VERSION), correlationId, now, 0L);
+        } else {
+            log.trace("Received produce response from node {} with correlation id {}", response.destination(), correlationId);
+            // if we have a response, parse it
+            if (response.hasResponse()) {
+                ProduceResponse produceResponse = (ProduceResponse) response.responseBody();
+                for (Map.Entry<TopicPartition, ProduceResponse.PartitionResponse> entry : produceResponse.responses().entrySet()) {
+                    TopicPartition tp = entry.getKey();
+                    ProduceResponse.PartitionResponse partResp = entry.getValue();
+                    ProducerBatch batch = batches.get(tp);
+                    completeBatch(batch, partResp, correlationId, now, receivedTimeMs + produceResponse.throttleTimeMs());
+                }
+                this.sensors.recordLatency(response.destination(), response.requestLatencyMs());
+            } else {
+                // this is the acks = 0 case, just complete all requests
+                for (ProducerBatch batch : batches.values()) {
+                    completeBatch(batch, new ProduceResponse.PartitionResponse(Errors.NONE), correlationId, now, 0L);
+                }
+            }
+        }
+    }
+```
+
+completeBatch()方法中又会细分异常场景，对于异常场景根据重试策略和具体异常决定是否重试，对于正常场景，则做收尾动作。最终会调用到每条消息的回调函数，即ProducerBatch#completeFutureAndFireCallbacks()中的逻辑，这个回调函数的逻辑是客户端自己定义的，比如ProducerPerformance中定义的回调函数逻辑为统计相关指标并打印相关异常。
+
+```java
+        public void onCompletion(RecordMetadata metadata, Exception exception) {
+            long now = System.currentTimeMillis();
+            int latency = (int) (now - start);
+            this.stats.record(iteration, latency, bytes, now);
+            if (exception != null)
+                exception.printStackTrace();
+        }
+```
+
 
 
 ## Selector
@@ -273,11 +438,11 @@ KafkaChannel使用Send和NetworkReceive表示网络传输中发送的请求和�
 
 当选择器调用KafkaChannel的read()和write()方法时，最终会通过NetworkReceive.readFrom()和Send.writeTo()方法调用SocketChannel的read()和write()方法。
 
-![Selector图片1](E:\github博客\技术博客\source\images\produce客户端\Selector图片1.png)
+![Selector图片1](D:\kafka相关\kafka源码整理\produce客户端\图片\Selector图片1.png)
 
 ### 通道上的读写操作
 
-![Selector图片2](E:\github博客\技术博客\source\images\produce客户端\Selector图片2.png)
+![Selector图片2](D:\kafka相关\kafka源码整理\produce客户端\图片\Selector图片2.png)
 
 Sender的run()方法中会调用client.send()，client.send()会调用Selector.send()，继而调用KafkaChannel.setSend（）。客户端发送的每个Send请求，都会被设置到一个Kafka通道中，如果一个Kafka通道上还有未发送成功的Send请求，则后面的请求就不能发送。即客户端发送请求给服务端，在一个Kafka通道中，一次只能发送一个Send请求。KafkaChannel.setSend()还注册了写事件，选择器监听到写事件，会调用KafkaChannel.write()方法，将setSend()保存到Kafka通道中的Send发送到传输层的SocketChannel中。
 
@@ -320,4 +485,125 @@ KafkaChannel.setSend()时会注册写事件，当请求全部写入SocketChannel
 ## 总结
 
 KafkaProducer中会起一个Sender线程，Sender线程中主要有两个方法：sendProducerData()和client.poll()。sendProducerData()负责准备数据并将数据set到通道中等待发送，client.poll()负责真正执行网络的io操作，在每次poll操作中必定有3次发送事件（假设集群中有3个kafka，生产者客户端会分别和3个kafka建立3个通道，这也是每次setSend不会失败的原因，如果失败了则该通道就关闭了）以及若干的接收响应事件。（在一次poll中，是否可以同时处理发送和接收？）。
+
+
+
+# 生产者客户端demo
+
+### 无认证
+
+```java
+package com.dahuatech.kafka;
+
+import org.apache.kafka.clients.producer.*;
+
+import java.util.Properties;
+
+public class ProduceDemo {
+    public static Properties initConfig() {
+        Properties props= new Properties() ;
+        String brokerList = "10.32.24.72:32120";
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG , brokerList) ;
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG ,
+                "org.apache.kafka.common.serialization.StringSerializer" ) ;
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                "org.apache.kafka.common.serialization.StringSerializer");
+        // produceId可以不设置，默认为“produce-xx”
+//        props.put (ProducerConfig.CLIENT_ID_CONFIG, "producer.client.id.demo") ;
+        // 重试参数，默认为0
+//        props.put(ProducerConfig.RETRIES_CONFIG, 2);
+        return props;
+    }
+
+    public static void main(String[] args) {
+        Properties props = initConfig();
+        KafkaProducer<String, String> producer = new KafkaProducer<>(props);
+
+        producer.send(new ProducerRecord<>("test", "messageByNormal"), new Callback() {
+                    @Override
+                    public void onCompletion (RecordMetadata metadata, Exception exception) {
+                        if (exception != null) {
+                            exception.printStackTrace();
+                        } else {
+                            System.out.println(metadata.topic() + "-" + metadata.partition() + ":" + metadata.offset());
+                        }
+                    }
+                });
+        producer.close();
+    }
+}
+
+```
+
+
+
+### kerberos认证
+
+需要在resources目录下提前放好krb5.conf和Kafka_Kafka.keytab文件。另外需要在客户端hosts文件中配置192.168.181.195和域名的映射关系。因为nslookup会返回两个结果hdp-kafka-hdp-kafka-0.hdp-kafka-hdp-kafka-0.kafka-perf-test.svc.cluster.local.和hdp-kafka-hdp-kafka-0.hdp-kafka-hdp-kafka.kafka-perf-test.svc.cluster.local.。如果hdp-kafka-hdp-kafka-0.hdp-kafka-hdp-kafka-0.kafka-perf-test.svc.cluster.local.在前则会认证失败，因为kerberos存的是hdp-kafka-hdp-kafka-0.hdp-kafka-hdp-kafka.kafka-perf-test.svc.cluster.local.。
+
+因此需要配置
+
+```
+192.168.181.195 hdp-kafka-hdp-kafka-0.hdp-kafka-hdp-kafka.kafka-perf-test.svc.cluster.local.
+```
+
+windows下路径：C:\Windows\System32\drivers\etc\hosts
+
+linux下路径：/etc/hosts
+
+```java
+package com.dahuatech.kafka;
+
+import org.apache.kafka.clients.CommonClientConfigs;
+import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.config.SaslConfigs;
+
+import java.util.Properties;
+
+public class ProduceWithKrbDemo {
+    public static Properties initConfig(String keytabFile, String principal) {
+        Properties props= new Properties() ;
+        String brokerList = "192.168.181.195:9090";
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG , brokerList) ;
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG ,
+                "org.apache.kafka.common.serialization.StringSerializer" ) ;
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                "org.apache.kafka.common.serialization.StringSerializer");
+        props.setProperty(SaslConfigs.SASL_MECHANISM, "GSSAPI");
+        props.setProperty(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SASL_PLAINTEXT");
+        props.setProperty(SaslConfigs.SASL_KERBEROS_SERVICE_NAME, "kafka");
+        props.setProperty(SaslConfigs.SASL_JAAS_CONFIG, "com.sun.security.auth.module.Krb5LoginModule required \n" +
+                "useKeyTab=true \n" +
+                "storeKey=true  \n" +
+                "refreshKrb5Config=true  \n" +
+                "keyTab=\"" + keytabFile + "\" \n" +
+                "principal=\"" + principal + "\";");
+        // produceId可以不设置，默认为“produce-xx”
+//        props.put (ProducerConfig.CLIENT_ID_CONFIG, "producer.client.id.demo") ;
+        // 重试参数，默认为0
+//        props.put(ProducerConfig.RETRIES_CONFIG, 2);
+        return props;
+    }
+
+    public static void main(String[] args) {
+        System.setProperty("java.security.krb5.conf", "src/main/resources/krb5.conf");
+        Properties props = initConfig("src/main/resources/Kafka_Kafka.keytab", "kafka/hdp-kafka-hdp-kafka-0.hdp-kafka-hdp-kafka.kafka-perf-test.svc.cluster.local");
+        KafkaProducer<String, String> producer = new KafkaProducer<>(props);
+
+        producer.send(new ProducerRecord<>("test", "messageByKrb"), new Callback() {
+            @Override
+            public void onCompletion (RecordMetadata metadata, Exception exception) {
+                if (exception != null) {
+                    exception.printStackTrace();
+                } else {
+                    System.out.println(metadata.topic() + "-" + metadata.partition() + ":" + metadata.offset());
+                }
+            }
+        });
+        producer.close();
+    }
+}
+
+```
+
 

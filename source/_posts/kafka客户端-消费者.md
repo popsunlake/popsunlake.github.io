@@ -136,6 +136,25 @@ public class ConsumeWithKrbDemo {
 
 ```
 
+## 消费者原理
+
+### 分区分配策略
+
+partition.assignment.strategy参数用于设置消费者于topic之间的分区分配策略。此参数的默认值为org.apache.kafka.clients.consumer.RangeAssignor。除此之外，kafka还提供了另外两种分配策略：RoundRobinAssignor和StickyAssignor。partition.assignment.strategy可以配置多个分配策略，彼此之间以逗号分隔。
+
+#### RangeAssignor分配策略
+
+核心：将消费组内的消费者按照名称的字典序排序，然后将分区平分，如果不能平均分配，则字典序靠前的消费者会多分配一个分区。
+
+#### RoundRobinAssignor分配策略
+
+核心：将消费组内的消费者按照名称的字典序排序，将所有topic的所有分区也按字典序排序，然后轮询分配给每个消费者。
+
+与RangeAssignor分配策略的区别：RangeAssignor是分别对每个topic操作，平均分配给消费者，如果无法平均分配，则字典序靠前的消费者会多分配一个分区。这样的做法可能不平均性会放大，因为有多个topic，但是基本保证了每个topic是平均的。
+
+#### StickyAssignor分配策略（todo）
+
+
 
 ## 消费者位移提交
 

@@ -6,11 +6,138 @@ categories:
   - [kafka, 服务端]
 ---
 
+## 消费者demo
+
+### 无认证
+
+<!-- more -->
+
+```java
+package com.dahuatech.kafka;
+
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Properties;
+
+public class ConsumeDemo {
+    public static Properties initConfig() {
+        Properties props= new Properties() ;
+        String brokerList = "10.32.24.72:32120";
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG , brokerList) ;
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG ,
+                "org.apache.kafka.common.serialization.StringDeserializer" ) ;
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                "org.apache.kafka.common.serialization.StringDeserializer");
+        // groupId必须设置，否则报错InvalidGroupIdException
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "demo1");
+        // auto.offset.reset代表从什么位移开始消费，默认为latest，即只消费新消息
+        // 以__consumer_offsets保存的消费位移为准，如果没有消费位移，比如新建了消费者，则会以auto.offset.reset为准
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        // consumerId可以不设置，默认为“consumer-xx”
+//        props.put (ConsumerConfig.CLIENT_ID_CONFIG, "consumer.client.id.demo") ;
+        return props;
+    }
+
+    public static void main(String[] args) {
+        Properties props = initConfig();
+        KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
+        consumer.subscribe(Arrays.asList("test"));
+        try {
+            while (true) {
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+                for (ConsumerRecord<String, String> record : records) {
+                    System.out.println("topic = " + record.topic() + ", partition = " + record.partition() + ", offset = " + record.offset());
+                    System.out.println("key = " + record.key() + ", value = " + record.value());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            consumer.close();
+        }
+    }
+}
+
+```
+
+
+
+### krb认证
+
+前置条件和注意事项和生产者demo完全一致
+
+```java
+package com.dahuatech.kafka;
+
+import org.apache.kafka.clients.CommonClientConfigs;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.config.SaslConfigs;
+
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Properties;
+
+public class ConsumeWithKrbDemo {
+    public static Properties initConfig(String keytabFile, String principal) {
+        Properties props= new Properties() ;
+        String brokerList = "192.168.181.195:9090";
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG , brokerList) ;
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG ,
+                "org.apache.kafka.common.serialization.StringDeserializer" ) ;
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                "org.apache.kafka.common.serialization.StringDeserializer");
+        // groupId必须设置，否则报错InvalidGroupIdException
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "demo2");
+        props.setProperty(SaslConfigs.SASL_MECHANISM, "GSSAPI");
+        props.setProperty(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SASL_PLAINTEXT");
+        props.setProperty(SaslConfigs.SASL_KERBEROS_SERVICE_NAME, "kafka");
+        props.setProperty(SaslConfigs.SASL_JAAS_CONFIG, "com.sun.security.auth.module.Krb5LoginModule required \n" +
+                "useKeyTab=true \n" +
+                "storeKey=true  \n" +
+                "refreshKrb5Config=true  \n" +
+                "keyTab=\"" + keytabFile + "\" \n" +
+                "principal=\"" + principal + "\";");
+        // auto.offset.reset代表从什么位移开始消费，默认为latest，即只消费新消息
+        // 以__consumer_offsets保存的消费位移为准，如果没有消费位移，比如新建了消费者，则会以auto.offset.reset为准
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        // consumerId可以不设置，默认为“consumer-xx”
+//        props.put (ConsumerConfig.CLIENT_ID_CONFIG, "consumer.client.id.demo") ;
+        return props;
+    }
+
+    public static void main(String[] args) {
+        System.setProperty("java.security.krb5.conf", "src/main/resources/krb5.conf");
+        Properties props = initConfig("src/main/resources/Kafka_Kafka.keytab", "kafka/hdp-kafka-hdp-kafka-0.hdp-kafka-hdp-kafka.kafka-perf-test.svc.cluster.local");
+        KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
+        consumer.subscribe(Arrays.asList("test"));
+        try {
+            while (true) {
+                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+                for (ConsumerRecord<String, String> record : records) {
+                    System.out.println("topic = " + record.topic() + ", partition = " + record.partition() + ", offset = " + record.offset());
+                    System.out.println("key = " + record.key() + ", value = " + record.value());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            consumer.close();
+        }
+    }
+}
+
+```
 
 
 ## 消费者位移提交
-
-<!-- more -->
 
 Kafka服务端并不会记录消费者的消费位置， 而是由消费者自己决定如何保存如何记录其消费的offset。 旧版本的消费者会将其消费位置记录到ZooKeeper中， 在新版本消费者中为了缓解ZooKeeper集群的压力， 在Kafka服务端中添加了一个名为\__consumer_offsets的内部Topic。消费者通过读取__consumer_offsets中记录的offset获取之前的消费位移， 并从此offset位置继续消费  
 

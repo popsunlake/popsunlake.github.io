@@ -153,7 +153,95 @@ partition.assignment.strategy参数用于设置消费者于topic之间的分区�
 与RangeAssignor分配策略的区别：RangeAssignor是分别对每个topic操作，平均分配给消费者，如果无法平均分配，则字典序靠前的消费者会多分配一个分区。这样的做法可能不平均性会放大，因为有多个topic，但是基本保证了每个topic是平均的。
 
 #### StickyAssignor分配策略（todo）
+### 消费者协调器和组协调器
 
+如果消费者客户端中配置了两个分配策略，那么以哪个为准？多个消费者之间的分区分配需要协同，如果配置的分配策略不同，以哪个为准？协同的过程又是怎样的。这一切都是交由消费者协调器（ConsumerCoordinator）和组协调器(GroupCoordinator）来完成的，它们之间使用一套组协调协议进行交互。
+
+所有消费组会分成多个子集，每个broker服务端有一个GroupCoordinate会负责管理几个消费组。而消费者客户端中的 ConsumerCoordinator组件负责与GroupCoordinator进行交互。  
+
+ConsumerCoordinator与GroupCoordinator之间最重要的职责就是负责执行消费者再均衡的操作，包括前面提及的分区分配的工作也是在再均衡期间完成的。就目前而言，一共有如下几种情形会触发再均衡的操作：
+
+* 有新的消费者加入消费组。
+* 有消费者失联 。 例如遇到长时间的GC、网络延迟导致消费者长时间未向GroupCoordinator发送心跳等情况时，GroupCoordinator会认为消费者己经异常。
+* 有消费者主动退出消费组（发送LeaveGroupRequest请求）。比如客户端调用了unsubscrible()方法取消对某些主题的订阅。
+* 消费组所对应的GroupCoorinator节点发生了变更。
+* 消费组内所订阅的任一主题或者主题的分区数量发生变化。  
+
+下面就以一个简单的例子来讲解一下再均衡操作的具体内容。当有消费者加入消费组时，消费者、消费组及组协调器之间会经历以下几个阶段。
+
+1. 第一阶段：寻找GroupCoordinate
+
+   消费者需要确定它所属的消费组对应的GroupCoordinator所在的broker，并创建与该broker相互通信的网络连接。如果消费者己经保存了与消费组对应的GroupCoordinator节点的信息，并且与它之间的网络连接是正常的，那么就可以进入第二阶段。否则，就需要向集群中的某个节点发送 FindCoordinatorRequest请求来查找对应的GroupCoordinator，这里的“某个节点” 指leastLoadedNode。  
+
+   FindCoordinatorRequest请求体中会指定消费组名称coordinator_key，即groupId，kafka服务端在收到FindCoordinatorRequest请求后会根据groupId计算在__consumer_offsets中的分区编号：
+
+   ```scala
+   Utils.abs(groupId.hashCode) % groupMetadataTopicPartitionCount
+   ```
+
+   其中groupMetadataTopicPartitionCount为主题__consumer_offsets的分区个数（通过offsets.topic.num.partitions配置，默认为50），找到对应的分区之后，再寻找此分区leader副本所在的 broker节点（默认3个副本），该broker节点即为这个groupld所对应的GroupCoordinator节点。消费者 groupId最终的分区分配方案及组内消费者所提交的消费位移信息都会发送给这个broker节点，让此broker节点既扮演GroupCoordinator的角色，又扮演保存分区分配方案和组内消费者位移的角色，这样可以省去很多不必要的中间轮转所带来的开销 。  
+
+2. 第二阶段：加入GroupCoordinate
+
+   在成功找到消费组所对应的GroupCoordinator之后就进入加入消费组的阶段，在此阶段的消费者会向GroupCoordinator发送JoinGroupRequest请求，并处理响应。  
+
+   JoinGroupRequest请求中会携带多个参数：
+
+   * groupId
+   * session_timeout_ms：GroupCoordinate超过session_timeout指定的时间内没有收到心跳报文则认为此消费者已经下线，由session.timeout.ms配置，默认为10s
+   * rebalance_timeout_ms：表示当消费组再平衡的时候，GroupCoordinator等待各个消费者重新加入的最长等待时间，对应消费端参数max.poll.interval.ms（注意这是对应消费者场景，如果是connect，则为rebalance.timeout.ms参数），默认5min。
+   * member_id：表示GroupCoordinator分配给消费者的id标识。消费者第一次发送JoinGroupRequest请求的时候此字段设置为null。
+   * group_instance_id：用户定义的对该消费者的唯一标识符
+   * protocol_type：表示消费组实现的协议，对于消费者而言此字段值为“ consumer ”
+   * protocols：支持的协议列表，数组类型，其中可以囊括多个分区分配策略，这个主要取决于消费者客户端参数partition.assignment.strategy的配置。
+
+   消费者在发送JoinGroupRequest请求之后会阻塞等待Kafka服务端的响应。接下来简要介绍服务端那边收到请求后的处理逻辑。
+
+   服务端在收到JoinGroupRequest 请求后会交由GroupCoordinator来进行处理。GroupCoordinator首先会对JoinGroupRequest请求做合法性校验。接着如果消费者是第一次请求加入消费组，那么JoinGroupRequest 请求中的 member_id 值为 null，即没有它自身的唯一标志，此时GroupCoordinator会负责为此消费者生成一个member_id。  生产的算法很简单，如下所示：
+
+   ```
+   String memberid = clientId + "-" + UUID.randomUUID().toString();
+   ```
+
+   此后，GroupCoordinator需要为消费组内的消费者选举出一个消费组的 leader，这个选举的算法也很简单，分两种情况分析。如果消费组内还没有 leader，那么第一个加入消费组的消费者即为消费组的leader。如果某一时刻leader消费者由于某些原因退出了消费组，那么会重新选举一个新的leader，新的leader即为HashMap中的第一个member。  
+
+   再之后就是选举分区分配策略，每个消费者都可以设置自己的分区分配策略，对消费组而言需要从各个消费者呈报上来的各个分配策略中选举一个彼此都“信服”的策略来进行整体上的分区分配 。这个分区分配的选举并非由leader消费者决定，而是根据消费组内的各个消费者投票来决定的。这里所说的 “根据组内的各个消费者投票来决定”不是指GroupCoordinator还要再与各个消费者进行进一步交互，而是根据各个消费者呈报的分配策略来实施。最终选举的分配策略基本上可以看作被各个消费者支持的最多的策略，具体的选举过程如下：
+
+   * 收集各个消费者支持的所有分配策略，组成候选集 candidates 。  
+   * 每个消费者从候选集 candidates 中 找出第一个自身支持的策略，为这个策略投上一票。 
+   * 计算候选集中各个策略的选票数，选票数最多的策略即为当前消费组的分配策略。  
+
+   如果有消费者并不支持选出的分配策略，那么就会报出异常IllegalArgumentException:Member does not support protocol 。 需要注意的是，这里所说的“消费者所支持的分配策略”是指 partition.assignment.strategy参数配置的策略，如果这个参数值只配置了RangeAssignor，那么这个消费者客户端只支持 RangeAssignor 分配策略，而不是消费者客户端代码中实现的 3 种分配策略及可能的自定义分配策略。
+
+   在此之后，Kafka服务端就要发送JoinGroupResponse响应给各个消费者，leader消费者和其他普通消费者收到的响应内容并不相同。leader消费者收到的响应中的members内容不为空，里面包含该消费组的成员信息，以及之前选定的分配策略。
+
+3. 第三阶段：SyncGroupRequest
+
+   leader消费者根据在第二阶段中选举出来的分区分配策略来实施具体的分区分配，在此之后需要将分配的方案同步给各个消费者，此时leader消费者并不是直接和其余的普通消费者同步分配方案，而是通过GroupCoordinator这个“中间人”来负责转发同步分配方案的。在第三阶段，也就是同步阶段，各个消费者会向GroupCoordinator发送SyncGroupRequest请求来同步分配方案。 
+
+   **疑问：如果是某个消费者加入，leader消费者如何感知到进行分配？分配好后又是如何让其他消费者感知到发送请求来拉取分配方案？**
+
+   leader消费者发送的SyncGroupRequest会包含具体的分区分配方案，保存在group_assignment字段中，其余消费者发送的SyncGroupRequest请求中的group_assignment为空。
+
+   下面看服务端收到SyncGroupRequest请求后的处理逻辑。
+
+   服务端在收到消费者发送的 SyncGroupRequest 请求之后会交由 GroupCoordinator 来负责具体的逻辑处理。GroupCoordinator 同样会先对 SyncGroupRequest 请求做合法性校验，在此之后会将从 leader 消费者发送过来的分配方案提取出来，连同整个消费组的元数据信息一起存入Kafka 的 consumer offsets 主题中（consumer offsets中不止保存了消费位移信息，还保存了消费组的元数据信息，是一条消息），最后发送响应给各个消费者以提供给各个消费者各自所属的分配方案。  
+
+   当消费者收到所属的分配方案之后会调用 PartitionAssignor 中的 onAssignment() 方法。随后再调用 ConsumerRebalanceListener 中的 OnPartitionAssigned()方法。之后开启心跳任务，消费者定期向服务端的 GroupCoordinator 发送 HeartbeatRequest 来确定彼此在线。
+
+4. 第四阶段：心跳
+
+   进入这个阶段之后，消费组中的所有消费者就会处于正常工作状态。在正式消费之前，消费者还需要确定拉取消息的起始位置。假设之前已经将最后的消费位移提交到了GroupCoordinator，并且GroupCoordinator将其保存到了Kafka内部__consumer_offsets主题中，此时消费者可以通过 OffsetFetchRequest 请求获取上次提交的消费位移并从此处继续消费。
+
+   消费者通过向 GroupCoordinator 发送心跳来维持它们与消费组的从属关系，以及它们对分区的所有权关系。只要消费者以正常的时间间隔发送心跳，就被认为是活跃的，说明它还在读取分区中的消息。心跳线程是一个独立的线程，可以在轮询消息的空档发送心跳。如果消费者停止发送心跳的时间足够长，则整个会话就被判定为过期，GroupCoordinator也会认为这个消费者己经死亡，就会触发一次再均衡行为。消费者的心跳间隔时间由参数heartbeat.interval.ms指定，默认值为3000，即3 秒，这个参数必须比 session.timeout.ms 参数设定的值要小，一般情况下 heartbeat.interval.ms的配置值不能超过session.timeout.ms配置值的1/3。这个参数可以调整得更低，以控制正常重新平衡的预期时间。  
+
+### __consumer_offsets
+
+__consumer_offsets会保存消费者客户端提交的消费位移，还会保存消费者组的元数据信（GroupMetadata）。具体来说，每个消费组的元数据信息都是一条消息。
+
+一般情况下，当集群中第一次有消费者消费消息时会自动创建主题__consumer_offsets，不过它的副本因子还受 offsets.topic.replication.factor 参数的约束，这个参数的默认值为3。分区数可以通过 offsets.topic.num.partitions 参数设置，默认为 50。客户端提交消费位移是使用OffsetCommitRequest 请求实现的。
+
+retention_time表示当前提交的消费位移所能保留的时长，不过对于消费者而言这个值保持为-1。也就是说，按照 broker端的配置offsets.retention.minutes来确定保留时长。offsets.retention.minutes的默认值为10080，即7天，超过这个时间后消费位移的信息就会被删除（使用墓碑消息和日志压缩策略）。注意这个参数在2.0.0版本之前的默认值为1440，即1天，很多关于消费位移的异常也是由这个参数的值配置不当造成的。有些定时消费的任务在执行完某次消费任务之后保存了消费位移，之后隔了一段时间再次执行消费任务，如果这个间隔时间超过offsets.retention.minutes的配置值，那么原先的位移信息就会丢失，最后只能根据客户端参数auto.offset.reset 来决定开始消费的位置，遇到这种情况时就需要根据实际情况来调配 offsets.retention.minutes 参数的值。  
 
 
 ## 消费者位移提交

@@ -1,3 +1,13 @@
+---
+title: kafka事务
+date: 2022-12-22 12:39:04
+tags: [kafka, 事务]
+categories:
+  - [kafka, 事务]
+---
+
+
+
 ## 消息传输保障
 
 一般而言，消息中间件的消息传输保障有 3 个层级，分别如下。  
@@ -8,11 +18,13 @@
 
 对于生产者而言，如果生产者发送消息到 Kafka之后，遇到了网络问题而造成通信中断，那么生产者就无法判断该消息是否己经提交。虽然 Kafka无法确定网络故障期间发生了什么，但生产者可以进行多次重试来确保消息 已经写入 Kafka,这个重试的过程中有可能会造成消息的重复写入，所以这里 Kafka 提供的消息传输保障为 at least once。
 
+<!-- more -->
+
 对消费者而言，消费者处理消息和提交消费位移的顺序在很大程度上决定了消费者提供哪一种消息传输保障 。 如果消费者在拉取完消息之后 ，应用逻辑先处理消息后提交消费位移，那么在消息处理之后且在位移提交之前消费者看机了，待它重新上线之后，会从上一次位移提交的位置拉取，这样就出现了重复消费，因为有部分消息已经处理过了只是还没来得及提交消费位移，此时就对应 at least once。如果消费者在拉完消息之后，应用逻辑先提交消费位移后进行  消息处理，那么在位移提交之后且在消息处理完成之前消费者岩机了，待它重新上线之后，会从己经提交的位移处开始重新消费，但之前尚有部分消息未进行消费，如此就会发生消息丢失，此时就对应 at most once 。  
 
 Kafka 从 0.11.0.0 版本开始引 入了军等和事务这两个特性，以此来实现 EOS ( exactly once semantics ，精确一次处理语义 。  
 
-### 幂等
+## 幂等
 
 所谓的幕等，简单地说就是对接口的多次调用所产生的结果和调用一次是一致的 。生产者在进行重试的时候有可能会重复写入消息，而使用 Kafka 的幕等性功能之后就可以避免这种情况。 
 
@@ -50,7 +62,7 @@ broker端会在内存中为每一对<PID, 分区>维护一个序列号。对于�
 
 引入序列号来实现幂等也只是针对每一对<PID, 分区>而言的，也就是说，Kafka的幂等只能保证单个生产者会话（ session ）中单分区的幂等。    
 
-### 事务
+## 事务
 
 幂等性并不能跨多个分区运作，而事务可以弥补这个缺陷。事务可以保证对多个分区写入操作的原子性。操作的原子性是指多个操作要么全部成功，要么全部失败，不存在部分成功、部分失败的可能。  
 
@@ -205,7 +217,9 @@ public class TransactionDemo {
 
 为了实现事务的功能，Kafka还引入了事务协调器（TransactionCoordinator）来负责处理事务，这一点可以类比一下组协调器（ GroupCoordinator ）。每一个生产者都会被指派一个特定的TransactionCoordinator，所有的事务逻辑包括分派PID等都是由TransactionCoordinator来负责实施的。TransactionCoordinator会将事务状态持久化到内部主题__transaction_state中。下面就以最复杂的consume-transform-produce的流程为例来分析Kafka 事务的实现原理。
 
-#### 查找TransactionCoordinator
+![consume-transform-produce流程图](E:\github博客\技术博客\source\images\kafka事务\consume-transform-produce流程图.png)
+
+### 查找TransactionCoordinator
 
 TransactionCoordinator负责分配PID和管理事务，因此生产者要做的第一件事情就是找出对应的 TransactionCoordinator所在的broker节点。与查找GroupCoordinator节点一样，也是通过FindCoordinatorRequest请求来实现的，只不过FindCoordinatorRequest中的coordinator_type就由原来的 0 变成了1，由此来表示与事务相关联。
 
@@ -217,21 +231,58 @@ Utils.abs(transactionalId.hashCode) % transactionTopicPartitionCount
 
 找到对应的分区之后，再寻找此分区leader副本所在的broker节点，该broker节点即为这个transactionalId对应的TransactionCoordinator节点。这一套逻辑和查找GroupCoordinator的逻辑如出一辙。
 
-#### 获取PID
+### 获取PID
 
 在找到 TransactionCoordinator 节点之后，就需要为当前生产者分配一个PID了。凡是开启了幂等性功能的生产者都必须执行这个操作，不需要考虑该生产者是否还开启了事务。生产者获取PID的操作是通过InitProducerIdRequest请求来实现的。
 
-生产者的InitProducerIdRequest请求会被发送给TransactionCoordinator。注意，如果未开启事务特性而只开启幂等特性，那么InitProducerldRequest请求可以发送给任意的broker。当TransactionCoordinator第一次收到包含该transactionalId的InitProducerIdRequest请求时，它会把transactionalId和对应的PID以消息（我们习惯性地把这类消息称为“事务日志消息”）的形式保存到主题__transaction_state 中。这样可以保证<transactionalId,PID>
-的对应关系被持久化，从而保证即使TransactionCoordinator宕机该对应关系也不会丢失。
+生产者的InitProducerIdRequest请求会被发送给TransactionCoordinator。注意，如果未开启事务特性而只开启幂等特性，那么InitProducerldRequest请求可以发送给任意的broker。当TransactionCoordinator第一次收到包含该transactionalId的InitProducerIdRequest请求时，它会把transactionalId和对应的PID以消息（我们习惯性地把这类消息称为“事务日志消息”）的形式保存到主题__transaction_state 中。这样可以保证<transactionalId,PID>的对应关系被持久化，从而保证即使TransactionCoordinator宕机该对应关系也不会丢失。
 
-#### 开启事务
+### 开启事务
 
 通过KafkaProducer的 beginTransaction()方法可以开启一个事务，调用该方法后，生产者本地会标记己经开启了 一个新的事务，只有在生产者发送第一条消息之后TransactionCoordinator才会认为该事务己经开启。
 
-#### Consume-Transform-Produce
+### Consume-Transform-Produce
 
+这个阶段囊括了整个事务的数据处理过程，其中还涉及多种请求。  
 
+#### AddPartitionsToTxnRequest  
 
+当生产者给一个新的分区（ TopicPartition ） 发送数据前， 它需要先向TransactionCoordinator发送 AddPartitionsToTxnRequest 请求，这个请求会让TransactionCoordinator将<transactionld, TopicPartition>的对应关系存储在主题__transaction_state 中，有了这个对照关系之后，我们就可以在后续的步骤中为每个分区设置 COMMIT 或 ABORT 标记。
 
+如果该分区是对应事务中的第一个分区，那么此时TransactionCoordinator还会启动对该事务的计时。 
 
+#### ProduceRequest
 
+这一步骤很容易理解，生产者通过 ProduceRequest 请求发送消息（ ProducerBatch ）到用户自定义主题中，这一点和发送普通消息时相同。和普通的消息不同的是，ProducerBatch 中会包含实质的 PID、producer _epoch和sequence_number。
+
+#### AddOffsetsToTxnRequest  
+
+通过KafkaProducer的sendOffsetsToTransaction()方法会向 TransactionCoordinator 节点发送 AddOffsetsToTxnRequest请求。TransactionCoordinator收到这个请求之后会通过 groupId 来推导出在\__consumer_offsets 中的分区 ，之后TransactionCoordinator会将这个分区保存在__transaction_state中。
+
+#### TxnOffsetCommitRequest  
+
+这个请求也是sendOffsetsToTransaction()方法中的一部分，在处理完AddOffsetsToTxnRequest之后，生产者还会发送 TxnOffsetCommitRequest 请求给 GroupCoordinator，从而将本次事务中包含的消费位移信息 offsets 存储到主题__consumer_offsets中
+
+### 提交或者中止事务
+
+一旦数据被写入成功，我们就可以调用KafkaProducer.abortTransaction()方法来结束当前的事务。
+
+#### EndTxnRequest
+
+无论调用commitTransaction()方法还是 abortTransaction()方法，生产者都会向TransactionCoordinator发送 EndTxnRequest 请求。以此来通知它提交（ Commit ）事务还是中止 （ Abort ） 事务 。  
+
+TransactionCoordinator 在收到 EndTxnRequest 请求后会执行如下操作：  
+
+* 将PREPARE_COMMIT 或 PREPARE_ABORT消息写入主题__transaction_state中
+* 通过 WriteTxnMarkersRequest 请求将 COMMIT 或 ABORT 信息写入用户所使用的普通主题和__consumer_offsets中
+* 将COMPLETE_COMMIT或 COMPLETE_ABORT 信息写入内部主题__transaction_state中
+
+#### WriteTxnMarkersRequest  
+
+WriteTxnMarkersRequest请求是由TransactionCoordinator发向事务中各个分区的 leader 节点的，当节点收到这个请求之后，会在相应的分区中写入控制消息（ ControlBatch ）。控制消息用来标识事务的终结，它和普通的消息一样存储在日志文件中，控制消息RecordBatch中attributes字段的第6位用来标识当前消息是否是控制消息。 如果是控制消息，那么这一位会置为1，否则会置为0。
+
+attributes字段中的第5位用来标识当前消息是否处于事务中，如果是事务中的消息，那么这一位置为1，否则置为0 。 由于控制消息也处于事务中，所以 attributes 字段的第 5位和第6位都被置为1。
+
+#### 写入最终的 COMPLETECOM MIT 或 COMPLETE_ABORT
+
+TransactionCoordinator将最终的COMPLETE_COMMIT或COMPLETE_ABORT信息写入主题\_\_transaction_state以表明当前事务已经结束，此时可以删除主题 \__transaction_state 中所有关于该事务的消息。 由于主题__transaction_state采用的日志清理策略为日志压缩，所以这里的删除只需将相应的消息设置为墓碑消息即可。  

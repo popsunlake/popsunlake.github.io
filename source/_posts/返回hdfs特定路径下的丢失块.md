@@ -1,3 +1,13 @@
+---
+title: 返回hdfs特定路径下的丢失块
+date: 2025-07-06 19:41:04
+tags: [hdfs,损坏文件]
+categories:
+  - [hdfs]
+---
+
+
+
 HBase需要知道hdfs存储路径/hbase先是否存在损坏文件，以此来指导HBase的自动修复工具是否运行。
 
 **【当前实现】**
@@ -18,15 +28,15 @@ hbase侧直接调用hadoop接口DistributedFileSystem#listCorruptFileBlocks(fina
 
 1、界面可以展示丢失块总数和前100个损坏文件。
 
-![界面损坏文件数](D:\kafka相关\111 博客文档整理\hdfs损坏文件图片\界面损坏文件数.png)
+![界面损坏文件数](D:\kafka相关\111 博客文档整理\hdfs\hdfs损坏文件图片\界面损坏文件数.svg)
 
-![界面损坏文件列表](D:\kafka相关\111 博客文档整理\hdfs损坏文件图片\界面损坏文件列表.png)
+![界面损坏文件列表](D:\kafka相关\111 博客文档整理\hdfs\hdfs损坏文件图片\界面损坏文件列表.svg)
 
 调用的都是FSNamesystem里面的方法，分别是getMissingBlocksCount()和getCorruptFiles()。
 
 getMissingBlocksCount()底层是获取priorityQueues队列中的第4队列的长度（损坏的block列表）
 
-![5个优先级队列的含义](D:\kafka相关\111 博客文档整理\hdfs损坏文件图片\5个优先级队列的含义.png)
+![5个优先级队列的含义](D:\kafka相关\111 博客文档整理\hdfs\hdfs损坏文件图片\5个优先级队列的含义.svg)
 
 getCorruptFiles()是调用listCorruptFileBlocks("/", null)拿到的损坏文件列表，listCorruptFileBlocks()单次调用最多返回100个损坏文件，因此界面上最多显示100个。listCorruptFileBlocks()具体逻辑将在后面介绍
 

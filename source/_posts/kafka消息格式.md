@@ -1,14 +1,14 @@
 ---
 title: kafka消息格式
 date: 2025-04-30 14:29:04
-tags: [kafka, messageFormatter]
+tags: [kafka, 消息个数]
 categories:
   - [kafka, 服务端]
 ---
 
 kafka0.11.0版本之后的消息结构如下所示：
 
-![消息格式](/images/消息格式.png)
+![消息格式](E:\github博客\技术博客\source\images\kafka消息格式\消息格式.png)
 
 RecordBatch内部包含了一条或多条消息。这一条或多条消息共用一个Header。
 <!-- more -->

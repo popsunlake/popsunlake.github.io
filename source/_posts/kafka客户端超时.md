@@ -1,6 +1,18 @@
-![produce客户端完整流程](D:\kafka相关\kafka源码整理\produce客户端\图片\produce客户端完整流程.jpg)
+---
+title: kafka客户端超时
+date: 2025-08-23 12:39:04
+tags: [kafka, 客户端, 生产者,超时]
+categories:
+  - [kafka, 客户端, 生产者]
+---
+
+
+
+![produce客户端完整流程](E:\github博客\技术博客\source\images\produce客户端\produce客户端完整流程.jpg)
 
 当服务端异常或限流时，消息在客户端会堆积，并最终超时。 下面分析客户端超时后的表现。
+
+<!--more-->
 
 从上面架构图中可以看出，主要是两个地方会超时，一个是RecordAccumulator中堆积的消息会超时，一个是InFlightRequests中堆积的生产请求会超时。下面分别来看对应的逻辑
 

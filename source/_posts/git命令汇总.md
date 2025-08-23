@@ -13,6 +13,8 @@ categories:
 
 git config --global core.quotepath false
 
+<!--more-->
+
 ### 生成ssh密钥并添加到github
 
 1. 生成新的ssh密钥

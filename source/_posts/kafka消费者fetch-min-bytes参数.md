@@ -2,7 +2,6 @@
 title: kafka消费者fetch.min.bytes参数
 date: 2025-08-23 12:39:04
 tags: [kafka, 客户端, 消费者, 消费大小]
-]
 categories:
   - [kafka, 客户端, 消费者]
 ---

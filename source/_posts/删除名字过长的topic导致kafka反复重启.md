@@ -14,6 +14,8 @@ kafka中创建了一个长度为249字符的topic，删除该topic后，服务�
 3jpx0iEC9eAd1ZtKdNRx9Y7djjPIWtus21NuVsoww5m6WhiGuOdEecW7wvatUFmP4UAl8NRwAE4fqNe8boHelZLBQRbXqpAwxhRuFu2g8kJr3lR44uGGmOqekiZQy6q5Zdsry33Co0HkGHuLQNFYX0TFOiJuR4fipMK7mODjEyx91HvrflWLrHr1rfYV7Hpvyotu1OyZk34sG5FHejFzgtsnq1u3mWmZrWbulBDlcgVGc8kNoOtQnOWTp
 ```
 
+<!--more-->
+
 服务报错信息：
 
 ![服务端报错信息](D:\kafka相关\111 博客文档整理\kafka\删除名字过长的topic导致kafka反复重启图片\服务端报错信息.svg)

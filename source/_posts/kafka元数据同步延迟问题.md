@@ -1,8 +1,20 @@
-【问题现象】
+---
+title: kafka元数据同步延迟问题
+date: 2025-08-23 19:41:04
+tags: [kafka,元数据,bugs,延迟]
+categories:
+  - [kafka,问题]
+---
+
+
+
+### 问题现象
 
 将上层逻辑简化一下，本质是创建了一个topic后，连续两次查询某个topic是否存在，第一次返回topic已经存在，第二次返回topic不存在。（两次查询间隔了2s左右）
 
-【问题排查】
+<!--more-->
+
+### 问题排查
 
 首先确定调用的接口是KakfaAdminClient#listTopics()，通过该接口拿到全量的topic信息，再判断当前查询的topic是否存在。
 
@@ -78,7 +90,7 @@ KakfaAdminClient#listTopics()本质上是向服务端发送元数据请求，**�
 
 通过dd命令测试数据盘性能，发现broker0除了少部分能到200MB/s外，大部分都是20-50MB/s。broker1和broker2都是稳定在200MB/s左右。
 
-【问题剖析】
+### 问题剖析
 
 对如下几个问题进行了进一步研究：
 

@@ -140,6 +140,13 @@ git config --global user.name “张三”
 git config --global user.email zhang_san@dahuatech.com
 ```
 
+### 删除远端文件并保留本地文件
 
+```
+git rm --cached secrets.json config/local.env
+git commit -m "remove sensitive files from repo"
+git push
+```
 
+`--cached` 的意思是 **只从暂存区（index）里移除文件**，不会删掉你工作区里的物理文件。
 

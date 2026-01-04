@@ -1,6 +1,18 @@
+---
+title: c3p0问题引起的ranger鉴权问题
+date: 2026-01-05 07:41:04
+tags: [ranger]
+categories:
+  - [ranger]
+---
+
+
+
 ### 问题现象
 
-mysql异常恢复后，ranger出现偶现没有重连mysql问题，导致无法使用，尝试复现并分析其中原因
+mysql异常恢复后，ranger出现偶现没有重连mysql问题，导致无法使用，尝试复现并分析其中原因。
+
+<!--more-->
 
 ### 问题排查
 

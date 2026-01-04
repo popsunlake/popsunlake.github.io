@@ -1,9 +1,9 @@
 ---
 title: hdfs上传文件失败
 date: 2025-09-14 21:09:04
-tags: [hdfs,文件上传失败,FileSystem]
+tags: [hdfs]
 categories:
-  - [hdfs,问题排查]
+  - [hdfs]
 ---
 
 ### 问题现象

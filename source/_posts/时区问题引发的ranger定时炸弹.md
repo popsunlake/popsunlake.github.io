@@ -1,8 +1,20 @@
+---
+title: 时区问题引发的ranger定时炸弹
+date: 2026-01-05 07:41:04
+tags: [ranger]
+categories:
+  - [ranger]
+---
+
+
+
 ### 问题现象
 
 有几个服务的ranger插件拉取策略失败，且最后更新时间都是2023-03-12 02:00:00，之后一直是拉取失败的状态。
 
 ranger服务端报错日志如下：
+
+<!--more-->
 
 ```
 2023-03-13 19:16:01,982 [http-bio-6080-exec-9] INFO  org.apache.ranger.common.RESTErrorUtil (RESTErrorUtil.java:63) - Request failed. loginId=null, logMessage=RangerKRBAuthenticationFilter Failed : Exception [EclipseLink-4002] (Eclipse Persistence Services - 2.5.2.v20140319-9ad6abd): org.eclipse.persistence.exceptions.DatabaseException

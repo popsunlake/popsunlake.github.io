@@ -1,3 +1,13 @@
+---
+title: ranger数据库死锁问题和提交patch
+date: 2026-01-05 07:41:04
+tags: [ranger]
+categories:
+  - [ranger]
+---
+
+
+
 ## 1 问题解决过程
 
 ### 1.1 现象
@@ -5,6 +15,8 @@
 计算平台在调用授权接口后偶现授权失败。具体表现为：调用授权接口后，等待20s，在相应数据库下创建表提示没有权限。
 
 ranger端日志报错：
+
+<!--more-->
 
 ```
 2022-03-21 20:14:29,685 [http-bio-6080-exec-13] ERROR org.apache.ranger.rest.ServiceREST (ServiceREST.java:1709) - createPolicy(RangerPolicy={id={null} guid={null} isEnabled={true} createdBy={null} updatedBy={null} createTime={null} updateTime={null} version={1} service={default-Hive} name={dcp-desensitize_a162c40cdc0140b1848b98415575be6c-1647864869626} policyType={0} policyPriority={0} description={} resourceSignature={4f15e3de95c81650ad869cb93a8c47a132bbec54bdf5de8c01f5075c19754cd7} isAuditEnabled={true} serviceType={null} resources={database={RangerPolicyResource={values={dcp } isExcludes={false} isRecursive={false} }} column={RangerPolicyResource={values={* } isExcludes={false} isRecursive={false} }} table={RangerPolicyResource={values={desensitize_a162c40cdc0140b1848b98415575be6c } isExcludes={false} isRecursive={false} }} } policyLabels={Consoler } policyConditions={} policyItems={RangerPolicyItem={accessTypes={RangerPolicyItemAccess={type={all} isAllowed={true} }} users={tangbiao2 } groups={} roles={} conditions={} delegateAdmin={false} }} denyPolicyItems={} allowExceptions={} denyExceptions={} dataMaskPolicyItems={} rowFilterPolicyItems={} options={} validitySchedules={, zoneName=null, isDenyAllElse={false} }}) failed

@@ -1,3 +1,13 @@
+---
+title: ranger并发创建相同资源策略问题
+date: 2026-01-05 07:41:04
+tags: [ranger]
+categories:
+  - [ranger]
+---
+
+
+
 ### 问题现象
 
 ranger中出现了两个资源相同的，且状态均为enabled的策略。
@@ -7,6 +17,8 @@ ranger中出现了两个资源相同的，且状态均为enabled的策略。
 ```
 Error Code : 3010 Another policy already exists for matching resource: policy-name=[hhh9], service=[default-Hdfs]"
 ```
+
+<!--more-->
 
 ### 问题定位
 

@@ -1,3 +1,13 @@
+---
+title: hdfs偶现授权失败问题排查
+date: 2026-01-05 07:41:04
+tags: [hdfs]
+categories:
+  - [hdfs]
+---
+
+
+
 ### 问题现象
 
 我们环境中有一个hive算子hdp_count_for_parquet，用来统计parquet文件的行数。该操作会遍历读取某个路径下的hdfs文件，因此会产生高频的鉴权操作（每秒几千次）。

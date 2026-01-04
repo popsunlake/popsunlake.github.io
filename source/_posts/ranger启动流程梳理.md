@@ -1,8 +1,20 @@
+---
+title: ranger启动流程梳理
+date: 2026-01-05 07:41:04
+tags: [ranger]
+categories:
+  - [ranger]
+---
+
+
+
 # 启动流程梳理
 
 入口：python dba_script.py -q
 
 -q代表quiteMode=true，即不是交互模式。
+
+<!--more-->
 
 1. 获得JAVA_BIN这个java路径
 

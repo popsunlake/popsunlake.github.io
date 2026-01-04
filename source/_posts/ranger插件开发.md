@@ -1,3 +1,13 @@
+---
+title: ranger插件开发
+date: 2026-01-05 07:41:04
+tags: [ranger]
+categories:
+  - [ranger]
+---
+
+
+
 ## 服务端生成服务
 
 ### 创建服务定义文件
@@ -5,6 +15,8 @@
 命名规则：ranger-servicedef-xxx.json。（xxx为服务名）
 
 文件存放路径：agents-common/src/main/resources/service-def目录下
+
+<!--more-->
 
 服务定义的配置文件是一个JSON格式的描述的文件，如下面例子，通常会包含这些字段
 

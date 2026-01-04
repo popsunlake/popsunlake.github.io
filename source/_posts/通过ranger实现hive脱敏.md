@@ -1,6 +1,18 @@
+---
+title: 通过ranger实现hive脱敏
+date: 2026-01-05 07:41:04
+tags: [ranger]
+categories:
+  - [ranger]
+---
+
+
+
 # 1 hive脱敏介绍
 
 hive支持rowfilter(行过滤)和datamask(列脱敏)。行过滤相当于一个强制性的where子句；列脱敏可以对某些具有敏感信息的列进行数据屏蔽，例如屏蔽身份证号的中间8位。下面介绍列脱敏相关内容。
+
+<!--more-->
 
 Ranger对hive支持的列脱敏处理方式：
 

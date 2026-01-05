@@ -1,9 +1,9 @@
 ---
 title: hdfs偶现授权失败问题排查
 date: 2026-01-05 07:41:04
-tags: [hdfs]
+tags: [ranger]
 categories:
-  - [hdfs]
+  - [ranger]
 ---
 
 

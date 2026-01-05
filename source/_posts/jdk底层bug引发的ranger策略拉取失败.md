@@ -1,3 +1,11 @@
+---
+title: jdk底层bug引发的ranger策略拉取失败
+date: 2026-01-05 16:41:04
+tags: [ranger]
+categories:
+  - [ranger]
+---
+
 ### 问题现象
 
 ranger客户端运行一段时间后可能会报错：
@@ -7,6 +15,8 @@ WARN [PolicyRefresher(serviceName=default-Hive)-40] client.RangerAdminRESTClient
 ```
 
 且一直不能恢复，除非重启。
+
+<!--more-->
 
 ### 问题定位
 

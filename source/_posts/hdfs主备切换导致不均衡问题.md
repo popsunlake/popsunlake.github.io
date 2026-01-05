@@ -14,7 +14,7 @@ categories:
 
 <!--more-->
 
-![主备切换问题](D:\hadoop文档\1. hdfs运维\主备切换问题.png)
+![主备切换问题](E:\github博客\技术博客\source\images\hdfs主备切换导致不均衡问题\主备切换后不均衡.png)
 
 从图中可以看出两个明显的异常：
 

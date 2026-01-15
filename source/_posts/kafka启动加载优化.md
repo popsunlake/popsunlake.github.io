@@ -695,3 +695,10 @@ TimeIndex#sanityCheck()中， \_entries是873813；lastTimestamp就是第_entrie
 2、对于最新的.timeindex来说，校验都不会通过，会触发恢复，拖慢启动速度
 
 ### 总结
+
+1. 引入去重以优化非优雅关闭重启耗时
+2. kafka-dump工具修复、校验逻辑修复
+3. 最终优化还引入了定时flush机制，在改动的时候有3点需要注意（踩过的坑）
+   * 在非优雅重启时需要写入recovery文件，以保证启动过程中再被kill（此时kill -15和kill -9效果一致）的时候，会复用之前的恢复结果。这里有一个坑，就是启动写入的时候只写入已经加载的分区，这样之前在recovery文件中已经存在的其它分区信息会给覆盖掉，导致会重新恢复。需要将启动过程中写入recovery文件的过程改造成全量写入。
+   * 一开始没有识别到.snapshot文件的作用，如果启动的时候没有.snapshot文件或者.snapshot文件记录的位移非activeSegment的最新位移，那么即使recovery文件中的位移是最新的，也会加载activeSegment。需要在flush的时候生成.snapshot文件，同时需要添加定时删除逻辑。
+   * 最开始定的是recovery中的offset >= 日志中的nextoffset，则跳过加载恢复，但是忽视了一种情况，就是虽然后台定时开启了flush，但是linux原生也会flush，可能存在.index中的内容flush了，但是日志文件内容还没有flush，即.index中的最新offset在log文件中还不存在，此时返回的nextoffset是上一个segment的lastoffset+1，永远不会进行恢复，这样下一条消息的位移就是上一个segment的lastoffset+1，log中的offset就乱序了，引起一系列问题。需要将 >= 修改为 == 

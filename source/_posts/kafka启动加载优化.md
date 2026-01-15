@@ -560,7 +560,7 @@ recoverSegment()底层调用的是LogSegment#recover()，他会将日志端对�
 
 从对loadLog()方法的剖析看，loadSegmentFiles()、completeSwapOperations()、recoverLog()都会调用recoverSegment()。completeSwapOperations()由于针对的是.swap文件，暂不考虑。
 
-- loadSegmentFiles()：只在索引文件校验不通过的时候执行recoverSegment()。实测发现，只要是非优雅关闭，且最新segment的.timeindex文件的实际大小不为0，该文件都会被视为是损坏的，分析见 http://jr.dahuatech.com:8080/browse/HDP-5641
+- loadSegmentFiles()：只在索引文件校验不通过的时候执行recoverSegment()。实测发现，只要是非优雅关闭，且最新segment的.timeindex文件的实际大小不为0，该文件都会被视为是损坏的，分析见 其它问题
 
 - recoverLog()：如果是非优雅关闭，则会对所有unflushed的segment进行恢复。注意：这个方法会对最少一个segment进行恢复，即使recoverycheckpoint中的offset已经是最新消息的offset。因为该方法在拿unflushed日志段的时候，是从小于等于recoverycheckpoint中offset的日志段为起始一直拿到最新的
 
@@ -650,7 +650,7 @@ Indexed offset: 0, found log offset: 1
 
 在打印内容时，会遍历timeIndex.entries，也就是873813次，如果实际只有5条数据怎么办？在代码逻辑中设置了退出条件，对于不存在的条目entry.offset=0。但是存在的问题是这个条件被放在了第3个case中，对于不存在的条目，其实已经被第2个case捕获了，因此不管实际数据是几条，都会遍历873817次。
 
-这个问题在https://issues.apache.org/jira/browse/KAFKA-7487中已经修复（这个单子不是专门修这个问题的，只是附带的），修复方法是将该判断条件提前到for循环的开头。
+这个问题在 https://issues.apache.org/jira/browse/KAFKA-7487 中已经修复（这个单子不是专门修这个问题的，只是附带的），修复方法是将该判断条件提前到for循环的开头。
 
 #### .timeindex校验失败
 
@@ -668,7 +668,7 @@ TimeIndex#sanityCheck()中， \_entries是873813；lastTimestamp就是第_entrie
 
 【疑问】
 
-对于2.b，从代码层面是将报错的现象解释清楚了，但随之而来两个疑问
+从代码层面是将报错的现象解释清楚了，但随之而来两个疑问
 
 1、对于优雅关闭来说，最新的.timeindex文件为何没被识别为corrupt
 

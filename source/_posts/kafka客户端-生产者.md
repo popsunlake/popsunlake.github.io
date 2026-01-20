@@ -26,6 +26,8 @@ produce客户端完整架构图如下所示：
 
 消息发送的过程，涉及两个线程协同工作。主线程首先将业务数据封装成ProducerRecord对象，之后调用send()方法将消息放入RecordAccumulator中暂存。Sender线程负责将消息信息构成请求，并最终执行网络IO的线程，他从RecordAccumulator中取出消息批量发送出去。需要注意的是，KafkaProducer是线程安全的，多个线程间可以共享使用同一个KafkaProducer对象。
 
+完整代码框图如下所示：（todo）https://www.processon.com/diagraming/696ee23626ed0d3fe55ccc11
+
 ## ProducerPerformance
 
 kafka做生产性能压测的时候会使用kafka-producer-perf-test.sh脚本，该脚本的入口类就是ProducerPerformance。因此我们将分析的起点放在该类。

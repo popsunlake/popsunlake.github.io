@@ -347,6 +347,8 @@ handleCompletedReceives()的代码如下所示，收到服务端的响应后，�
     }
 ```
 
+handleTimedOutRequests()会获取inFlightRequests中的所有过期的请求（先根据过期请求得到发往的nodeId，再将所有发往nodeId的请求响应置为disconnected，后续在回调函数中处理。
+
 completeResponses()的代码如下所示，可以看到是对所有的responses执行了对应请求的回调函数。
 
 ```java
@@ -361,7 +363,7 @@ completeResponses()的代码如下所示，可以看到是对所有的responses�
     }
 ```
 
-clientRequest的回调逻辑定义在Sender#handleProduceResponse()中。根据response中的响应分为以下3种，并最终调用completeBatch()方法。
+clientRequest的回调逻辑是在Sender#sendProduceRequest()中定义的，调用的是Sender#handleProduceResponse()方法。根据response中的响应分为以下3种，最终都会调用到completeBatch()方法。
 
 * 网络异常
 * 版本不匹配
@@ -404,7 +406,9 @@ clientRequest的回调逻辑定义在Sender#handleProduceResponse()中。根据r
     }
 ```
 
-completeBatch()方法中又会细分异常场景，对于异常场景根据重试策略和具体异常决定是否重试，对于正常场景，则做收尾动作。最终会调用到每条消息的回调函数，即ProducerBatch#completeFutureAndFireCallbacks()中的逻辑，这个回调函数的逻辑是客户端自己定义的，比如ProducerPerformance中定义的回调函数逻辑为统计相关指标并打印相关异常。
+completeBatch()方法中又会细分异常场景，对于异常场景根据重试策略和具体异常决定是否重试（如果异常时RetriableException的子类则会重试，比如超时的时候最终解析到的异常是NetworkException，属于RetriableException）；对于正常场景，则做收尾动作。
+
+最终会调用到每条消息的回调函数，即ProducerBatch#completeFutureAndFireCallbacks()中的逻辑，这个回调函数的逻辑是客户端自己定义的，比如ProducerPerformance中定义的回调函数逻辑为统计相关指标并打印相关异常。
 
 ```java
         public void onCompletion(RecordMetadata metadata, Exception exception) {

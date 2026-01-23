@@ -28,7 +28,7 @@ produce客户端完整架构图如下所示：
 
 完整代码框图如下所示：
 
-![produce代码流程图](E:\github博客\技术博客\source\images\produce客户端\produce代码流程图.png)
+![produce代码流程图](E:\github博客\技术博客\source\images\produce客户端\produce代码流程图.svg)
 
 ## ProducerPerformance
 

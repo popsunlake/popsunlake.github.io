@@ -13,9 +13,13 @@ categories:
 
 <!--more-->
 
-https://www.processon.com/diagraming/65337e56d657a234397e52f5
+消费流程代码框图：
 
-https://www.processon.com/diagraming/66177a8a828a7308dc313e4f
+![consumer代码框图](E:\github博客\技术博客\source\images\consume客户端\consumer代码框图.svg)
+
+coordinator代码框图：
+
+![coordinator代码框图](E:\github博客\技术博客\source\images\consume客户端\coordinator代码框图.svg)
 
 ## KafkaConsumer
 

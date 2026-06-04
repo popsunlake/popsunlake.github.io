@@ -98,6 +98,34 @@ a {
   padding: clamp(18px, 4vw, 56px);
   display: grid;
   place-items: center;
+  position: relative;
+}
+
+.site-back-link {
+  position: absolute;
+  top: clamp(14px, 3vw, 28px);
+  left: clamp(18px, 4vw, 56px);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface-strong) 82%, transparent);
+  text-decoration: none;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  transition:
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.site-back-link:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  color: var(--accent);
+  transform: translateY(-1px);
 }
 
 .profile-card {

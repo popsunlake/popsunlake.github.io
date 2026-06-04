@@ -3,22 +3,35 @@ const path = require('path');
 
 const POSTS_DIR = path.join(__dirname, 'source', '_posts');
 
-function fixImagePath(filePath) {
+function toSiteImagePath(src) {
+  if (!src || /^(?:https?:|data:|#|\/images\/)/i.test(src)) return src;
+
+  let decoded = src.trim();
+  try {
+    decoded = decodeURI(decoded);
+  } catch {
+    return src;
+  }
+
+  decoded = decoded
+    .replace(/^file:\/\/\/?/i, '')
+    .replace(/\\/g, '/');
+
+  const marker = decoded.match(/(?:^|\/)source\/images\//i);
+  if (!marker) return src;
+
+  const imagePath = decoded.slice(marker.index + marker[0].length);
+  return imagePath ? `/images/${imagePath}` : src;
+}
+
+function checkImagePath(filePath) {
   const data = fs.readFileSync(filePath, 'utf8');
-  const fixedData = data.replace(/!\[([^\]]*)\]\(([^\)]+)\)/g, function(match, alt, src) {
-    // 解码URL，然后替换反斜杠为正斜杠
-    let decodedPath = decodeURIComponent(src).replace(/\\/g, '/');
-
-    // 按路径分割，取最后两部分
-    const parts = decodedPath.split('/');
-    const lastTwo = parts.slice(-2).join('/');
-
-    // 拼接成新的路径
-    let newPath = `/images/${lastTwo}`;
-
-    return `![${alt}](${newPath})`;
+  data.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+"([^"]*)")?\)/g, (match, alt, src) => {
+    const fixedSrc = toSiteImagePath(src);
+    if (fixedSrc !== src) {
+      console.log(`${path.relative(__dirname, filePath)}: ${src} -> ${fixedSrc}`);
+    }
   });
-  fs.writeFileSync(filePath, fixedData, 'utf8');
 }
 
 function traverseDirectory(directory) {
@@ -27,10 +40,10 @@ function traverseDirectory(directory) {
     if (fs.lstatSync(fullPath).isDirectory()) {
       traverseDirectory(fullPath);
     } else if (fullPath.endsWith('.md')) {
-      fixImagePath(fullPath);
+      checkImagePath(fullPath);
     }
   });
 }
 
 traverseDirectory(POSTS_DIR);
-console.log('Image paths have been fixed!');
+console.log('Image path check completed. Source Markdown files were not modified.');

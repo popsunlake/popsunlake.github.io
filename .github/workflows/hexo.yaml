@@ -26,7 +26,7 @@ defaults:
     shell: bash
 
 jobs:
-  # 1) 生成静态站点并上传为工件
+  # 1) Generate the static site and upload it as an artifact.
   build:
     runs-on: ubuntu-latest
     steps:
@@ -38,24 +38,21 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20          # 如需 Node-18 改成 18
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Fix image paths (可选)
-        run: node fix-image-paths.js
-
       - name: Build with Hexo
-        run: npx hexo generate      # 等价 npx hexo g
+        run: npx hexo generate
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./public            # Hexo 输出目录
+          path: ./public
 
-  # 2) 部署到 GitHub Pages
+  # 2) Deploy to GitHub Pages.
   deploy:
     needs: build
     runs-on: ubuntu-latest

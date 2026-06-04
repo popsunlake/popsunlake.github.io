@@ -9,7 +9,22 @@ const OUTPUT_DIR = path.join(LIFE_BLOG_ROOT, 'content', 'science', 'AI日报');
 
 function pickField(frontMatter, name) {
   const fieldMatch = frontMatter.match(new RegExp(`^${name}:\\s*(.+)$`, 'm'));
-  return fieldMatch ? fieldMatch[1].trim() : '';
+  return fieldMatch ? fieldMatch[1].trim().replace(/^["']|["']$/g, '') : '';
+}
+
+function transformBody(body) {
+  const headingMap = new Map([
+    ['## 今日摘要', '## 今日导读'],
+    ['## 大事记', '## 重点事件'],
+    ['## 模型与产品更新', '## 产品与工具'],
+    ['## 研究与开源', '## 研究与开源'],
+    ['## 值得关注', '## 延伸观察'],
+    ['## 参考链接', '## 参考链接']
+  ]);
+
+  return body
+    .replace(/<!-- more -->\r?\n?/g, '')
+    .replace(/^## .+$/gm, heading => headingMap.get(heading) || heading);
 }
 
 function sync(sourceArg) {
@@ -33,17 +48,6 @@ function sync(sourceArg) {
   const basename = path.basename(sourcePath, '.md');
   const canonicalUrl = `https://popsunlake.github.io/${date.slice(0, 4)}/${date.slice(5, 7)}/${date.slice(8, 10)}/${encodeURI(basename)}/`;
 
-  const headingMap = new Map([
-    ['## 今日摘要', '## 今日导读'],
-    ['## 大事记', '## 重点事件'],
-    ['## 值得关注', '## 阅读备注'],
-    ['## 参考链接', '## 原文与参考']
-  ]);
-
-  const transformedBody = body
-    .replace(/<!-- more -->\r?\n?/g, '')
-    .replace(/^## .+$/gm, heading => headingMap.get(heading) || heading);
-
   const output = `+++
 title = "${title}"
 toc = true
@@ -56,11 +60,11 @@ align = "justify"
 
 +++
 
-> 来源：[技术博客原文](${canonicalUrl})
+> 来源：同步自[技术博客原文](${canonicalUrl})
 >
-> 说明：本文为 AI 日报同步版，保留事件主线、判断和参考链接，方便在生活博客中按科技主题归档检索。
+> 说明：本文为 AI 日报同步版，保留事件主线、判断和参考链接，便于在生活博客中按科技主题归档检索。
 
-${transformedBody}
+${transformBody(body)}
 `;
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });

@@ -6,6 +6,7 @@
     "build": "hexo generate",
     "clean": "hexo clean",
     "deploy": "hexo deploy",
+    "notify:ai-daily": "node scripts/notify-ai-daily.js",
     "server": "hexo server"
   },
   "hexo": {

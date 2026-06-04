@@ -2,6 +2,12 @@ const STORAGE_KEY = "zcw-namecard-theme";
 const themeButtons = document.querySelectorAll("[data-theme-value]");
 const supportedThemes = ["light", "swan", "sport", "night"];
 
+document.querySelectorAll("img[data-src]").forEach((image) => {
+  if (!image.getAttribute("src")) {
+    image.setAttribute("src", image.dataset.src);
+  }
+});
+
 function applyTheme(theme) {
   const nextTheme = supportedThemes.includes(theme) ? theme : "light";
   document.body.dataset.theme = nextTheme;

@@ -40,10 +40,10 @@ function stripMarkdown(markdown) {
 
 function extractSummary(body) {
   const beforeMore = body.split(/<!--\s*more\s*-->/i)[0];
-  const withoutHeading = beforeMore.replace(/^##\s+.+$/m, '').trim();
-  const paragraph = withoutHeading.split(/\r?\n\r?\n/).find(Boolean) || '';
+  const withoutFirstHeading = beforeMore.replace(/^##\s+.+$/m, '').trim();
+  const paragraph = withoutFirstHeading.split(/\r?\n\r?\n/).find(Boolean) || '';
   const summary = stripMarkdown(paragraph);
-  return summary.length > 220 ? `${summary.slice(0, 217)}...` : summary;
+  return summary.length > 160 ? `${summary.slice(0, 157)}...` : summary;
 }
 
 function buildUrls(date, basename) {
@@ -52,9 +52,8 @@ function buildUrls(date, basename) {
   const day = date.slice(8, 10);
   const techUrl = process.env.AI_DAILY_TECH_URL
     || `${TECH_BASE_URL}/${year}/${month}/${day}/${encodeURIComponent(basename)}/`;
-  const lifeSlug = basename.toLowerCase();
   const lifeUrl = process.env.AI_DAILY_LIFE_URL
-    || `${LIFE_BASE_URL}/${LIFE_SECTION.split('/').map(encodeURIComponent).join('/')}/${encodeURIComponent(lifeSlug)}/`;
+    || `${LIFE_BASE_URL}/${LIFE_SECTION.split('/').map(encodeURIComponent).join('/')}/${encodeURIComponent(basename)}/`;
   return { techUrl, lifeUrl };
 }
 

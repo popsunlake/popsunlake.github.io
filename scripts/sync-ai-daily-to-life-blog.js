@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SOURCE_ROOT = process.cwd();
-const LIFE_BLOG_ROOT = 'E:\\github博客\\生活博客';
+const LIFE_BLOG_ROOT = process.env.AI_DAILY_LIFE_BLOG_ROOT || 'E:\\github博客\\生活博客';
 const OUTPUT_DIR = path.join(LIFE_BLOG_ROOT, 'content', 'science', 'AI日报');
 
 function pickField(frontMatter, name) {
@@ -62,7 +62,7 @@ align = "justify"
 
 > 来源：同步自[技术博客原文](${canonicalUrl})
 >
-> 说明：本文为 AI 日报同步版，保留事件主线、判断和参考链接，便于在生活博客中按科技主题归档检索。
+> 说明：本文为 AI 日报同步版，保留事件主线、判断和参考链接，方便在生活博客中按科技主题归档检索。
 
 ${transformBody(body)}
 `;

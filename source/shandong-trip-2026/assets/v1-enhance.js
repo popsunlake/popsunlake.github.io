@@ -24,7 +24,7 @@ async function robustCopy(text){
  else{const toast=document.getElementById('copyToast');if(toast){toast.textContent='已复制：'+text;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1700)}}
 }
 function focusCard(day,id){
- const el=document.createElement('section');el.className='v15-focus';el.innerHTML='<div class="v15-focus-top"><span class="v15-focus-label">TODAY FOCUS · 当天重点</span><span class="v15-focus-day">'+id.slice(0,2)+'-'+id.slice(2)+'</span></div><p class="v15-focus-summary">'+day.sub+'</p><div class="v15-keyrow">'+day.keys.map(k=>'<div class="v15-key"><b>'+k[0]+'</b><small>'+k[1]+'</small></div>').join('')+'</div>';return el;
+ const el=document.createElement('section');el.className='v15-focus';el.innerHTML='<div class="v15-focus-top"><span class="v15-focus-label">KEY MOMENTS · 关键时间</span><span class="v15-focus-day">'+id.slice(0,2)+'-'+id.slice(2)+'</span></div><div class="v15-keyrow">'+day.keys.map(k=>'<div class="v15-key"><b>'+k[0]+'</b><small>'+k[1]+'</small></div>').join('')+'</div>';return el;
 }
 function panelHead(k){
  const map={timeline:['ITINERARY','行程','按时间执行'],route:['ROUTE','路线','距离与交通'],food:['FOOD & STAY','吃住','餐厅与住宿'],reminders:['NOTES','提醒','现场预案']},v=map[k];
@@ -58,11 +58,46 @@ function enhanceDay(id){
    let found=null,next=null;
    items.forEach(it=>{const t=(it.querySelector('.tl-time')||{}).textContent||'',m=t.match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/);if(!m)return;const a=minutes(m[1]),b=minutes(m[2]);if(a<=clock.min&&clock.min<b)found=it;if(a>clock.min&&!next)next=it});
    const target=found||next;if(target){const titleText=(target.querySelector('.tl-title')||{}).textContent||'';const timeText=(target.querySelector('.tl-time')||{}).textContent||'';now.querySelector('small').textContent=found?'现在':'下一项';now.querySelector('b').textContent=timeText+' · '+titleText;now.querySelector('span').textContent=found?'进行中':'即将开始';target.style.borderColor='#9db9a7';}
- } else if(clock.date<d.date){now.querySelector('small').textContent='出行前';now.querySelector('b').textContent=d.keys[0][0]+' · '+d.keys[0][1];now.querySelector('span').textContent='首个节点'}
+ } else if(clock.date<d.date){now.hidden=true}
  document.querySelectorAll('.food .btn.map').forEach(btn=>{const h=btn.closest('.food')?.querySelector('h3');if(h)btn.dataset.copy=h.textContent.trim()});
- document.addEventListener('click',e=>{const t=e.target.closest('[data-copy]');if(!t)return;e.preventDefault();const card=t.closest('.premium-points .navpoint');if(card){const cards=Array.from(document.querySelectorAll('.premium-points .navpoint')),nodes=Array.from(document.querySelectorAll('.route-node')),i=cards.indexOf(card);cards.forEach(x=>x.classList.remove('selected'));nodes.forEach(x=>x.classList.remove('selected'));card.classList.add('selected');if(nodes[i])nodes[i].classList.add('selected')}e.stopImmediatePropagation();robustCopy(t.dataset.copy)},true);
- const nodes=Array.from(document.querySelectorAll('.route-node')),cards=Array.from(document.querySelectorAll('.premium-points .navpoint'));
- nodes.forEach((node,i)=>{const card=cards[i];if(!card)return;node.setAttribute('tabindex','0');node.setAttribute('role','button');node.setAttribute('aria-label','查看 '+(card.querySelector('span')?.textContent||'地点'));const sel=()=>{nodes.forEach(n=>n.classList.remove('selected'));cards.forEach(c=>c.classList.remove('selected'));node.classList.add('selected');card.classList.add('selected');card.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'nearest'});};node.addEventListener('click',sel);node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sel()}});card.addEventListener('click',()=>{nodes.forEach(n=>n.classList.remove('selected'));cards.forEach(c=>c.classList.remove('selected'));node.classList.add('selected');card.classList.add('selected')})});
+ const routeCard=panels.route.querySelector('.route-map-card');
+ let selectRoutePoint=null;
+ if(routeCard){
+   const nodes=Array.from(routeCard.querySelectorAll('.route-node'));
+   const cards=Array.from(routeCard.querySelectorAll('.premium-points .navpoint'));
+   const source=routeCard.querySelector('.premium-legs');
+   const sourceLegs=source?Array.from(source.querySelectorAll('.leg-chip')):[];
+   const extras={0910:{8:['跨城','落地']},0911:{7:['跨城']},0913:{2:['跨城']}}[id]||{};
+   if(source){
+     source.classList.add('v15-leg-source');
+     const wrap=source.closest('.legs-wrap');
+     const view=document.createElement('div');view.className='v15-leg-view';
+     wrap.insertBefore(view,source);
+     function legData(leg){
+       return{label:(leg.querySelector('.leg-top b')?.textContent||'').trim(),mode:(leg.querySelector('.leg-top span')?.textContent||'').trim(),dist:(leg.querySelector('.leg-bottom strong')?.textContent||'').trim(),time:(leg.querySelector('.leg-bottom small')?.textContent||'').trim()};
+     }
+     function renderLeg(index){
+       const n=index+1,name=(cards[index]?.querySelector('span')?.textContent||('地标 '+n)).trim();
+       let matches=sourceLegs.filter(leg=>legData(leg).label.startsWith(n+'→'));
+       const special=extras[n]||[];
+       if(special.length)matches=matches.concat(sourceLegs.filter(leg=>special.includes(legData(leg).label)));
+       if(!matches.length)matches=sourceLegs.filter(leg=>legData(leg).label.endsWith('→'+n));
+       const items=matches.map(leg=>{const x=legData(leg);return'<div class="v15-leg-item"><div class="v15-leg-main"><b>'+x.label+'</b><span>'+x.mode+'</span></div><div class="v15-leg-meta"><strong>'+x.dist+'</strong><small>'+x.time+'</small></div></div>'}).join('');
+       view.innerHTML='<div class="v15-leg-view-head"><div><small>当前地标</small><b>'+n+' · '+name+'</b></div><span>'+(matches.length?matches.length+' 段':'到达点')+'</span></div>'+(items||'<div class="v15-leg-empty">这是当天路线的到达点，没有下一段本地路线。</div>');
+     }
+     selectRoutePoint=(index,scrollCard)=>{
+       nodes.forEach(n=>n.classList.remove('selected'));cards.forEach(c=>c.classList.remove('selected'));
+       if(nodes[index])nodes[index].classList.add('selected');
+       if(cards[index])cards[index].classList.add('selected');
+       renderLeg(index);
+       if(scrollCard&&cards[index])cards[index].scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'nearest'});
+     };
+     nodes.forEach((node,i)=>{const card=cards[i];if(!card)return;node.setAttribute('tabindex','0');node.setAttribute('role','button');node.setAttribute('aria-label','查看 '+(card.querySelector('span')?.textContent||'地点')+' 的路段');const sel=()=>selectRoutePoint(i,true);node.addEventListener('click',sel);node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();sel()}});});
+     cards.forEach((card,i)=>{const small=card.querySelector('small');if(small)small.textContent='查看路段 · 复制地点';card.addEventListener('click',()=>selectRoutePoint(i,false));});
+     if(cards.length)selectRoutePoint(0,false);
+   }
+ }
+ document.addEventListener('click',e=>{const t=e.target.closest('[data-copy]');if(!t)return;e.preventDefault();const card=t.closest('.premium-points .navpoint');if(card&&selectRoutePoint){const cards=Array.from(routeCard.querySelectorAll('.premium-points .navpoint')),i=cards.indexOf(card);if(i>=0)selectRoutePoint(i,false)}e.stopImmediatePropagation();robustCopy(t.dataset.copy)},true);
 }
 function enhanceHome(){
  const cards=Array.from(document.querySelectorAll('.premium-overview'));cards.forEach(card=>{const m=(card.getAttribute('href')||'').match(/(09\d\d)/);if(!m)return;const p=document.createElement('span');p.className='v15-home-focus';p.textContent='当天重点 · '+HOME_FOCUS[m[1]];card.appendChild(p)});

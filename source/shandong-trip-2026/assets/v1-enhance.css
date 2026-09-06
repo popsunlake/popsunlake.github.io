@@ -59,3 +59,12 @@ button{font:inherit;color:inherit}
 .v15-leg-empty{padding:11px;border-radius:12px;background:#fff;color:#7b847e;font-size:10px;border:1px dashed #d8ddd8}
 
 .v15-now[hidden]{display:none!important}
+
+/* V1.5 route clarity: never show the full leg strip once the enhancer is active. */
+.v15-enhanced .v15-panel[data-panel="route"] .premium-legs{display:none!important}
+.v15-enhanced .route-node{transition:transform .16s ease,filter .16s ease}
+.v15-enhanced .route-node.selected{transform:scale(1.10);filter:drop-shadow(0 5px 8px rgba(219,109,55,.28))}
+.v15-enhanced .route-node.selected .node-halo{fill:rgba(219,109,55,.38)!important}
+.v15-enhanced .route-node.selected .node-dot{fill:#db6d37!important;stroke:#fff!important;stroke-width:6!important}
+.v15-enhanced .route-node.selected text{font-weight:900!important;fill:#fff!important}
+.v15-enhanced .premium-points .navpoint.selected{border:2px solid #db6d37!important;background:#fff8f3!important;box-shadow:0 7px 18px rgba(219,109,55,.13)!important}

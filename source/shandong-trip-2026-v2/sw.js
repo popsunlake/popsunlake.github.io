@@ -1,5 +1,5 @@
 'use strict';
-const VERSION='shandong-family-2026-e38eb04bfc82';
+const VERSION='shandong-family-2026-v2-tabs-20260906-1601';
 const CACHE_PREFIX='shandong-family-2026-';
 const FILES=['./','index.html','0908.html','0909.html','0910.html','0911.html','0912.html','0913.html','credits.html','assets/trip.css','assets/trip.js','assets/favicon.svg','assets/qingdao.webp','assets/jinan.webp'];
 const urls=FILES.map(path=>new URL(path,self.registration.scope).href);

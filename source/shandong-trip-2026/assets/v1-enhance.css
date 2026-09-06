@@ -41,3 +41,5 @@ button{font:inherit;color:inherit}
 @keyframes v15-in{from{opacity:.35;transform:translateY(3px)}to{opacity:1;transform:none}}
 @media(max-width:520px){.v15-tabs{top:65px}.v15-tab{padding:8px 2px}.v15-tab b{font-size:11px}.v15-tab small{font-size:7px}.v15-panel{padding:10px 8px 3px}.v15-focus h3{font-size:18px}.v15-now{padding:9px 10px}}
 @media(prefers-reduced-motion:reduce){.v15-panel{animation:none}}
+
+.v15-focus-summary{margin:7px 0 0!important;color:#e2ebe5!important;font-size:11px!important;line-height:1.65}

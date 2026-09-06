@@ -63,7 +63,19 @@ body{padding-bottom:30px}
 .overview-card .odate{font-size:11px;font-weight:800;color:var(--green)}.overview-card h2{font-size:19px;margin:5px 0}.overview-card p{font-size:11px;color:var(--muted);margin:0}
 @media(min-width:650px){.overview-grid{grid-template-columns:1fr 1fr}.page-hero h1{font-size:40px}}
 </style>
-</head>
+
+<style>
+.segment-block{margin:10px 0 12px}.segment-title{font-size:11px;font-weight:800;margin-bottom:7px;color:#47534c}
+.segment-list{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;scroll-snap-type:x proximity}
+.segment-chip{min-width:142px;background:#fff;border:1px solid #dedfd9;border-radius:12px;padding:9px 10px;scroll-snap-align:start}
+.segment-chip b{display:block;font-size:11px;color:#173e2d}.segment-chip span{display:block;font-size:11px;font-weight:750;margin-top:2px}.segment-chip em{display:block;font-style:normal;font-size:10px;color:#a6532e;margin-top:2px}.segment-chip small{font-size:9px;color:#727a74}
+.segment-foot{font-size:9px;color:#7c837e;margin-top:5px}
+.copy-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#17201b;color:#fff;padding:10px 14px;border-radius:999px;font-size:12px;z-index:999;opacity:0;pointer-events:none;transition:.2s;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+.copy-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.navpoint{font-family:inherit;text-align:left;cursor:pointer}
+.btn.map{cursor:pointer;border:0;font-family:inherit}
+.audit-note{margin:10px 0;background:#fff7e9;border:1px solid #ecd6b5;border-radius:14px;padding:10px 12px;font-size:11px;line-height:1.65;color:#67492f}
+</style></head>
 <body>
 <header class="page-hero"><div class="inner"><div class="ey">09-08 · 青岛</div><h1>抵达青岛 · 五四广场夜景</h1><p>当天独立页面 · 不与其他日期混在一起</p></div></header>
 <nav class="multi-nav">
@@ -86,25 +98,52 @@ body{padding-bottom:30px}
 <path d="M50 404 C220 345,360 430,520 362 S760 306,860 352" fill="none" stroke="#e5e1d8" stroke-width="18"/>
 <text x="44" y="48" font-size="22" font-weight="800" fill="#183d2e">09-08 · 青岛初见</text>
 <text x="44" y="76" font-size="12" fill="#6b746e">路线仅保留编号，避免手机端地名重叠；编号对应下方地点卡片</text>
-<path d="M110 110 L110 350 L670 410 L735 385 L310 365" fill="none" stroke="#cf7543" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="13 9"/>
+<path d="M 110 110 L 110 350 L 670 410 L 735 385 L 310 365 L 110 350" fill="none" stroke="#cf7543" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="13 9"/>
 <circle cx="110" cy="110" r="17" fill="#173e2d" stroke="white" stroke-width="4" filter="url(#s)"/><text x="110" y="115" text-anchor="middle" font-size="13" font-weight="800" fill="white">1</text>
 <circle cx="110" cy="350" r="17" fill="#173e2d" stroke="white" stroke-width="4" filter="url(#s)"/><text x="110" y="355" text-anchor="middle" font-size="13" font-weight="800" fill="white">2</text>
 <circle cx="670" cy="410" r="17" fill="#173e2d" stroke="white" stroke-width="4" filter="url(#s)"/><text x="670" y="415" text-anchor="middle" font-size="13" font-weight="800" fill="white">3</text>
 <circle cx="735" cy="385" r="17" fill="#173e2d" stroke="white" stroke-width="4" filter="url(#s)"/><text x="735" y="390" text-anchor="middle" font-size="13" font-weight="800" fill="white">4</text>
 <circle cx="310" cy="365" r="17" fill="#173e2d" stroke="white" stroke-width="4" filter="url(#s)"/><text x="310" y="370" text-anchor="middle" font-size="13" font-weight="800" fill="white">5</text>
-</svg></div><p class="map-note">地图内只显示路线和编号，避免小屏幕文字重叠。1、2、3… 对应下方同编号地点卡片；点卡片可打开高德 H5 地图。</p><div class="pointgrid">
+</svg></div><div class="segment-block"><div class="segment-title">两点之间 · 距离 / 出行方式</div><div class="segment-list"><div class="segment-chip"><b>1→2</b><span>🚕 打车</span><em>约15km</em><small>45–50分</small></div><div class="segment-chip"><b>2→3</b><span>🚕 打车</span><em>约3km</em><small>10–15分</small></div><div class="segment-chip"><b>3→4</b><span>🚶 步行</span><em>约0.5km</em><small>约7分</small></div><div class="segment-chip"><b>4→5</b><span>🚶 海边步行</span><em>约1km</em><small>15–20分</small></div><div class="segment-chip"><b>5→2</b><span>🚕 回酒店</span><em>约3km</em><small>10–15分</small></div></div><div class="segment-foot">距离均为旅行执行用的约数；景区内部以当天景交/索道调度为准。</div></div><p class="map-note">地图内只显示路线和编号，避免小屏幕文字重叠。1、2、3… 对应下方地点卡片；点卡片直接复制地点名，再到高德App粘贴搜索。</p><div class="pointgrid">
 <a class="navpoint" href="https://uri.amap.com/search?keyword=%E9%9D%92%E5%B2%9B%E5%8C%97%E7%AB%99&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener"><b>1</b><span>青岛北站</span><small>高德地图</small></a>
 <a class="navpoint" href="https://uri.amap.com/search?keyword=%E6%A1%94%E5%AD%90%E9%85%92%E5%BA%97%EF%BC%88%E9%9D%92%E5%B2%9B%E4%BA%94%E5%9B%9B%E5%B9%BF%E5%9C%BA%E4%B8%87%E8%B1%A1%E5%9F%8E%E5%BA%97%EF%BC%89&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener"><b>2</b><span>桔子酒店</span><small>高德地图</small></a>
 <a class="navpoint" href="https://uri.amap.com/search?keyword=%E9%9D%92%E6%9C%AA%E4%BA%86%C2%B7%E6%B5%B7%E9%B2%9C%E9%9D%92%E5%B2%9B%E8%8F%9C%C2%B7%E9%94%85%E8%B4%B4%EF%BC%88%E5%A5%A5%E5%B8%86%E4%B8%AD%E5%BF%83%E5%BA%97%EF%BC%89&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener"><b>3</b><span>青未了·海鲜青岛菜·锅贴</span><small>高德地图</small></a>
 <a class="navpoint" href="https://uri.amap.com/search?keyword=%E9%9D%92%E5%B2%9B%E5%A5%A5%E5%B8%86%E4%B8%AD%E5%BF%83&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener"><b>4</b><span>奥帆中心</span><small>高德地图</small></a>
 <a class="navpoint" href="https://uri.amap.com/search?keyword=%E9%9D%92%E5%B2%9B%E4%BA%94%E5%9B%9B%E5%B9%BF%E5%9C%BA&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener"><b>5</b><span>五四广场</span><small>高德地图</small></a>
-</div><details class="amap-help"><summary>微信里查看高德地图</summary>
-        <div class="detail">微信会限制网页直接拉起第三方 App，所以这里改成稳定的高德 H5 地图：点击一定会进入地图页面。需要 App 导航时，再在高德页面内选择“打开高德地图”。备用入口：<div class="fallbacks"><a href="https://uri.amap.com/search?keyword=%E9%9D%92%E5%B2%9B%E5%8C%97%E7%AB%99&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener">青岛北站</a> · <a href="https://uri.amap.com/search?keyword=%E6%A1%94%E5%AD%90%E9%85%92%E5%BA%97&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener">桔子酒店</a> · <a href="https://uri.amap.com/search?keyword=%E9%9D%92%E6%9C%AA%E4%BA%86%C2%B7%E6%B5%B7%E9%B2%9C%E9%9D%92%E5%B2%9B%E8%8F%9C%C2%B7%E9%94%85%E8%B4%B4%EF%BC%88%E5%A5%A5%E5%B8%86%E4%B8%AD%E5%BF%83%E5%BA%97%EF%BC%89&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener">青未了·海鲜青岛菜·锅贴</a> · <a href="https://uri.amap.com/search?keyword=%E4%BA%94%E5%9B%9B%E5%B9%BF%E5%9C%BA&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener">五四广场</a> · <a href="https://uri.amap.com/search?keyword=%E5%A5%A5%E5%B8%86%E4%B8%AD%E5%BF%83&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener">奥帆中心</a></div></div>
-      </details>
-    </div><div class="card"><div class="date">执行时间轴</div><div class="timeline"><div class="row"><div class="time">09:52–17:52</div><div class="rail"></div><div><b>杭州西 → 青岛北</b><small>已确认高铁</small></div></div><div class="row"><div class="time">18:10–19:00</div><div class="rail"></div><div><b>打车到桔子酒店</b><small>按45–50分钟预留</small></div></div><div class="row"><div class="time">19:20–20:20</div><div class="rail"></div><div><b>晚餐｜青未了·海鲜青岛菜·锅贴（五四广场永旺店）</b><small>鲅鱼水饺、海胆水饺、海肠捞饭；加香酥鸡和时蔬</small></div></div><div class="row"><div class="time">20:20–21:30</div><div class="rail"></div><div><b>奥帆中心 → 五四广场夜景</b><small>饭店就在奥帆中心附近，吃完沿海边一路向五四广场走；外婆累了随时打车回酒店</small></div></div></div></div>
+</div><details class="amap-help"><summary>为什么不直接跳高德？</summary><div class="detail">微信内直接打开高德网页容易遇到验证，直接拉起高德App又经常被微信拦截。现在改成最稳定的方式：点地点卡片即可复制地名，随后打开高德App，在搜索框粘贴即可。这样不经过高德网页，也不会碰验证码。</div></details>
+    </div><div class="card"><div class="date">执行时间轴</div><div class="timeline"><div class="row"><div class="time">09:52–17:52</div><div class="rail"></div><div><b>杭州西 → 青岛北</b><small>已确认高铁</small></div></div><div class="row"><div class="time">18:10–19:00</div><div class="rail"></div><div><b>打车到桔子酒店</b><small>按45–50分钟预留</small></div></div><div class="row"><div class="time">19:20–20:20</div><div class="rail"></div><div><b>晚餐｜青未了·海鲜青岛菜·锅贴（奥帆中心店）</b><small>虾仁锅贴、海肠捞饭、香酥鸡；再配清淡时蔬/汤</small></div></div><div class="row"><div class="time">20:20–21:30</div><div class="rail"></div><div><b>奥帆中心 → 五四广场夜景</b><small>饭店就在奥帆中心附近，吃完沿海边一路向五四广场走；外婆累了随时打车回酒店</small><div class="row"><div class="time">21:30–21:45</div><div class="rail"></div><div><b>五四广场 → 桔子酒店</b><small>打车约10–15分钟，第一晚不再加景点。</small></div></div></div></div>
 <div class="food"><small>奥帆中心附近 · 家庭晚餐</small><h3>青未了·海鲜青岛菜·锅贴（奥帆中心店）</h3><div class="dishes"><span class="dish">虾仁锅贴</span><span class="dish">海肠捞饭</span><span class="dish">香酥鸡</span><span class="dish">砂锅姜蓉焗鲈鱼</span><span class="dish">清淡时蔬</span></div><div class="actions"><a class="btn dp" href="https://www.dianping.com/search/keyword/21/0_%E9%9D%92%E6%9C%AA%E4%BA%86%E6%B5%B7%E9%B2%9C%E9%9D%92%E5%B2%9B%E8%8F%9C%E9%94%85%E8%B4%B4%E5%A5%A5%E5%B8%86%E4%B8%AD%E5%BF%83%E5%BA%97" target="_blank" rel="noopener">大众点评搜索</a><a class="btn map" href="https://uri.amap.com/search?keyword=%E9%9D%92%E6%9C%AA%E4%BA%86%C2%B7%E6%B5%B7%E9%B2%9C%E9%9D%92%E5%B2%9B%E8%8F%9C%C2%B7%E9%94%85%E8%B4%B4%EF%BC%88%E5%A5%A5%E5%B8%86%E4%B8%AD%E5%BF%83%E5%BA%97%EF%BC%89&view=map&src=shandongtrip&callnative=0" target="_blank" rel="noopener">高德地图</a></div><div class="detail" style="margin-top:8px">地址：新会路12号（中航翔通大酒店内/奥帆中心附近）。第一晚吃完饭直接逛奥帆中心，再沿海边走到五四广场，动线比原来的前海沿更顺。</div></div>
 <details><summary>老人节奏</summary><div class="detail">第一晚不再去台东、栈桥。坐了8小时高铁，只完成晚餐和五四广场夜景。</div></details>
 
       
     </section></main>
-</body></html>
+
+<div id="copyToast" class="copy-toast"></div>
+<script>
+(function(){
+  const toast=document.getElementById('copyToast');
+  function show(msg){ toast.textContent=msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),1800); }
+  function fallbackCopy(text){
+    const ta=document.createElement('textarea'); ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.focus(); ta.select(); let ok=false;
+    try{ ok=document.execCommand('copy'); }catch(e){}
+    ta.remove(); return ok;
+  }
+  async function copyText(text){
+    let ok=false;
+    try{ if(navigator.clipboard&&window.isSecureContext){ await navigator.clipboard.writeText(text); ok=true; } }catch(e){}
+    if(!ok) ok=fallbackCopy(text);
+    show(ok ? '已复制：'+text+'｜打开高德App粘贴搜索' : '长按复制：'+text);
+  }
+  document.querySelectorAll('.navpoint').forEach(el=>{
+    const name=(el.querySelector('span')||{}).textContent || '';
+    const small=el.querySelector('small'); if(small) small.textContent='复制地点';
+    el.addEventListener('click',e=>{e.preventDefault(); copyText(name);});
+  });
+  document.querySelectorAll('.btn.map').forEach(el=>{
+    const card=el.closest('.food'); const h=card&&card.querySelector('h3'); const name=h?h.textContent.trim():'';
+    el.textContent='复制到高德';
+    el.addEventListener('click',e=>{e.preventDefault(); copyText(name);});
+  });
+})();
+</script></body></html>

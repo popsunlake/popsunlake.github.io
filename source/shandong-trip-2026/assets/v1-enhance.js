@@ -24,7 +24,7 @@ async function robustCopy(text){
  else{const toast=document.getElementById('copyToast');if(toast){toast.textContent='已复制：'+text;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1700)}}
 }
 function focusCard(day,id){
- const el=document.createElement('section');el.className='v15-focus';el.innerHTML='<div class="v15-focus-top"><span class="v15-focus-label">TODAY FOCUS · 当天重点</span><span class="v15-focus-day">'+id.slice(0,2)+'-'+id.slice(2)+'</span></div><h3>'+day.focus+'</h3><p>'+day.sub+'</p><div class="v15-keyrow">'+day.keys.map(k=>'<div class="v15-key"><b>'+k[0]+'</b><small>'+k[1]+'</small></div>').join('')+'</div>';return el;
+ const el=document.createElement('section');el.className='v15-focus';el.innerHTML='<div class="v15-focus-top"><span class="v15-focus-label">TODAY FOCUS · 当天重点</span><span class="v15-focus-day">'+id.slice(0,2)+'-'+id.slice(2)+'</span></div><p class="v15-focus-summary">'+day.sub+'</p><div class="v15-keyrow">'+day.keys.map(k=>'<div class="v15-key"><b>'+k[0]+'</b><small>'+k[1]+'</small></div>').join('')+'</div>';return el;
 }
 function panelHead(k){
  const map={timeline:['ITINERARY','行程','按时间执行'],route:['ROUTE','路线','距离与交通'],food:['FOOD & STAY','吃住','餐厅与住宿'],reminders:['NOTES','提醒','现场预案']},v=map[k];

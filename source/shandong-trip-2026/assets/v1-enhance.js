@@ -32,6 +32,7 @@ function panelHead(k){
 }
 function enhanceDay(id){
  const d=DAYS[id],root=document.querySelector('.full-day');if(!d||!root)return;
+ document.body.classList.add('v15-enhanced');
  const title=root.querySelector('.day-title');
  const focus=focusCard(d,id);title.insertAdjacentElement('afterend',focus);
  const now=document.createElement('div');now.className='v15-now';now.innerHTML='<div class="copy"><small>当天安排</small><b>'+d.focus+'</b></div><span>按计划执行</span>';focus.insertAdjacentElement('afterend',now);
@@ -67,7 +68,7 @@ function enhanceDay(id){
    const cards=Array.from(routeCard.querySelectorAll('.premium-points .navpoint'));
    const source=routeCard.querySelector('.premium-legs');
    const sourceLegs=source?Array.from(source.querySelectorAll('.leg-chip')):[];
-   const extras={0910:{8:['跨城','落地']},0911:{7:['跨城']},0913:{2:['跨城']}}[id]||{};
+   const extras={'0910':{8:['跨城','落地']},'0911':{7:['跨城']},'0913':{2:['跨城']}}[id]||{};
    if(source){
      source.classList.add('v15-leg-source');
      const wrap=source.closest('.legs-wrap');

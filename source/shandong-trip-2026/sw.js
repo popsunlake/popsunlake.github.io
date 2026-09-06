@@ -1,5 +1,5 @@
 'use strict';
-const VERSION='shandong-trip-v1-5-20260906-b';
+const VERSION='shandong-trip-v1-5-20260906-c';
 const FILES=['./','index.html','0908.html','0909.html','0910.html','0911.html','0912.html','0913.html','assets/v1-enhance.css','assets/v1-enhance.js'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(VERSION).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('shandong-trip-v1-')&&k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

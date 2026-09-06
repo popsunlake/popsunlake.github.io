@@ -66,6 +66,7 @@ function enhanceDay(id){
  if(routeCard){
    const nodes=Array.from(routeCard.querySelectorAll('.route-node'));
    const cards=Array.from(routeCard.querySelectorAll('.premium-points .navpoint'));
+   const segments=Array.from(routeCard.querySelectorAll('.route-segment'));
    const source=routeCard.querySelector('.premium-legs');
    const sourceLegs=source?Array.from(source.querySelectorAll('.leg-chip')):[];
    const extras={'0910':{8:['跨城','落地']},'0911':{7:['跨城']},'0913':{2:['跨城']}}[id]||{};
@@ -87,9 +88,13 @@ function enhanceDay(id){
        view.innerHTML='<div class="v15-leg-view-head"><div><small>当前地标</small><b>'+n+' · '+name+'</b></div><span>'+(matches.length?matches.length+' 段':'到达点')+'</span></div>'+(items||'<div class="v15-leg-empty">这是当天路线的到达点，没有下一段本地路线。</div>');
      }
      selectRoutePoint=(index,scrollCard)=>{
-       nodes.forEach(n=>n.classList.remove('selected'));cards.forEach(c=>c.classList.remove('selected'));
+       nodes.forEach(n=>n.classList.remove('selected'));cards.forEach(c=>c.classList.remove('selected'));segments.forEach(s=>s.classList.remove('selected'));
        if(nodes[index])nodes[index].classList.add('selected');
        if(cards[index])cards[index].classList.add('selected');
+       const point=String(index+1);
+       let related=segments.filter(s=>s.dataset.from===point);
+       if(!related.length)related=segments.filter(s=>s.dataset.to===point);
+       related.forEach(s=>s.classList.add('selected'));
        renderLeg(index);
        if(scrollCard&&cards[index])cards[index].scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth',block:'nearest'});
      };

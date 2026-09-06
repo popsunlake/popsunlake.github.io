@@ -68,3 +68,12 @@ button{font:inherit;color:inherit}
 .v15-enhanced .route-node.selected .node-dot{fill:#db6d37!important;stroke:#fff!important;stroke-width:6!important}
 .v15-enhanced .route-node.selected text{font-weight:900!important;fill:#fff!important}
 .v15-enhanced .premium-points .navpoint.selected{border:2px solid #db6d37!important;background:#fff8f3!important;box-shadow:0 7px 18px rgba(219,109,55,.13)!important}
+
+/* V1.5 explicit route segments: each connection is drawn independently. */
+.route-segment{fill:none;pointer-events:none}
+.route-segment.route-underlay{stroke:#fff;stroke-width:13;stroke-linecap:round;stroke-linejoin:round;opacity:.96}
+.route-segment.route-line{stroke:#2f6f53;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;opacity:.88;transition:stroke .16s ease,stroke-width .16s ease,opacity .16s ease,filter .16s ease}
+.route-segment.return.route-line{stroke:#c6784c;stroke-dasharray:12 9}
+.route-segment.roundtrip.route-line{stroke:#4d7c67;stroke-dasharray:18 8}
+.route-segment.route-line.selected{stroke:#db6d37!important;stroke-width:10!important;opacity:1!important;filter:drop-shadow(0 4px 5px rgba(219,109,55,.28))}
+.route-segment.route-underlay.selected{stroke-width:16!important;opacity:1!important}

@@ -57,3 +57,5 @@ button{font:inherit;color:inherit}
 .v15-leg-main b{display:block;font-size:11px;color:#173e2d}.v15-leg-main span{display:block;font-size:10px;margin-top:2px;color:#56635c}
 .v15-leg-meta{text-align:right}.v15-leg-meta strong{display:block;font-size:11px;color:#c45c2d}.v15-leg-meta small{display:block;font-size:9px;color:#7a837d;margin-top:2px}
 .v15-leg-empty{padding:11px;border-radius:12px;background:#fff;color:#7b847e;font-size:10px;border:1px dashed #d8ddd8}
+
+.v15-now[hidden]{display:none!important}

@@ -151,3 +151,92 @@
     });
   }
 })(typeof window==='undefined'?globalThis:window);
+
+/* V2.1 MODULE TABS START */
+(function(){
+  'use strict';
+  const body=document.body,switcher=document.querySelector('.module-switcher');
+  if(!switcher)return;
+  const names=['timeline','route','food','reminders'];
+  const buttons=Array.from(switcher.querySelectorAll('[data-module]'));
+  const panels=Object.fromEntries(names.map(name=>[name,document.getElementById(name)]));
+  const timeline=panels.timeline,nowCard=document.getElementById('now-card');
+
+  if(timeline&&nowCard){
+    const heading=timeline.querySelector('.section-heading');
+    if(heading)heading.insertAdjacentElement('afterend',nowCard);
+  }
+  const ticket=document.querySelector('.day-aside > .ticket');
+  if(timeline&&ticket){
+    ticket.classList.add('module-ticket');
+    const now=document.getElementById('now-card');
+    if(now)now.insertAdjacentElement('afterend',ticket);
+    else{
+      const heading=timeline.querySelector('.section-heading');
+      if(heading)heading.insertAdjacentElement('afterend',ticket);
+    }
+  }
+
+  function moduleFromHash(){
+    const hash=location.hash.replace('#','');
+    if(names.includes(hash))return hash;
+    if(hash.startsWith('step-'))return'timeline';
+    if(hash.startsWith('point-'))return'route';
+    return null;
+  }
+  function activate(name,options={}){
+    if(!names.includes(name))name='timeline';
+    body.dataset.activeModule=name;
+    buttons.forEach(btn=>{
+      const active=btn.dataset.module===name;
+      btn.classList.toggle('active',active);
+      btn.setAttribute('aria-selected',active?'true':'false');
+      btn.tabIndex=active?0:-1;
+    });
+    names.forEach(key=>{
+      const panel=panels[key];
+      if(!panel)return;
+      const active=key===name;
+      panel.hidden=!active;
+      panel.setAttribute('aria-hidden',active?'false':'true');
+      if('inert' in panel)panel.inert=!active;
+    });
+    if(options.updateHash)history.replaceState(null,'','#'+name);
+    if(options.scroll){
+      const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      switcher.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});
+    }
+  }
+
+  buttons.forEach((btn,index)=>{
+    btn.addEventListener('click',()=>activate(btn.dataset.module,{scroll:true,updateHash:true}));
+    btn.addEventListener('keydown',event=>{
+      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+      event.preventDefault();
+      let next=index;
+      if(event.key==='ArrowLeft')next=(index-1+buttons.length)%buttons.length;
+      if(event.key==='ArrowRight')next=(index+1)%buttons.length;
+      if(event.key==='Home')next=0;
+      if(event.key==='End')next=buttons.length-1;
+      buttons[next].focus();
+      activate(buttons[next].dataset.module,{updateHash:true});
+    });
+  });
+
+  document.addEventListener('click',event=>{
+    const link=event.target.closest('a[href^="#"]');
+    if(!link)return;
+    const target=link.getAttribute('href').slice(1);
+    let module=names.includes(target)?target:null;
+    if(target.startsWith('step-'))module='timeline';
+    if(target.startsWith('point-'))module='route';
+    if(module)activate(module);
+  });
+  window.addEventListener('hashchange',()=>{
+    const name=moduleFromHash();
+    if(name)activate(name);
+  });
+
+  activate(moduleFromHash()||'timeline');
+})();
+/* V2.1 MODULE TABS END */

@@ -7,7 +7,7 @@ const path = require('path');
 
 const TECH_BASE_URL = process.env.AI_DAILY_TECH_BASE_URL || 'https://popsunlake.github.io';
 const LIFE_BASE_URL = process.env.AI_DAILY_LIFE_BASE_URL || 'https://yangxuze.github.io';
-const LIFE_SECTION = process.env.AI_DAILY_LIFE_SECTION || 'science/AI日报';
+const LIFE_SECTION = process.env.AI_DAILY_LIFE_SECTION || 'science/ai日报';
 
 function parseArgs(argv) {
   return {
@@ -53,7 +53,7 @@ function buildUrls(date, basename) {
   const techUrl = process.env.AI_DAILY_TECH_URL
     || `${TECH_BASE_URL}/${year}/${month}/${day}/${encodeURIComponent(basename)}/`;
   const lifeUrl = process.env.AI_DAILY_LIFE_URL
-    || `${LIFE_BASE_URL}/${LIFE_SECTION.split('/').map(encodeURIComponent).join('/')}/${encodeURIComponent(basename)}/`;
+    || `${LIFE_BASE_URL}/${LIFE_SECTION.split('/').map(encodeURIComponent).join('/')}/${encodeURIComponent(basename.toLowerCase())}/`;
   return { techUrl, lifeUrl };
 }
 

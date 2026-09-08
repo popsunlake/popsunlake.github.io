@@ -44,7 +44,8 @@ function sync(sourceArg) {
   const body = match[2].trim();
   const title = pickField(frontMatter, 'title');
   const date = pickField(frontMatter, 'date');
-  const isoDate = `${date.slice(0, 10)}T12:00:00+08:00`;
+  const sourceTime = date.match(/^\d{4}-\d{2}-\d{2}[ T](\d{2}:\d{2}:\d{2})/);
+  const isoDate = `${date.slice(0, 10)}T${sourceTime ? sourceTime[1] : '00:00:00'}+08:00`;
   const basename = path.basename(sourcePath, '.md');
   const canonicalUrl = `https://popsunlake.github.io/${date.slice(0, 4)}/${date.slice(5, 7)}/${date.slice(8, 10)}/${encodeURI(basename)}/`;
 
